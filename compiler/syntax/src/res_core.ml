@@ -2694,24 +2694,24 @@ and parse_jsx p =
   Parser.leave_breadcrumb p Grammar.Jsx;
   let start_pos = p.Parser.start_pos in
   Parser.expect LessThan p;
-  let jsx_expr =
+  let jsx_expr, jsx_attrs =
     match p.Parser.token with
     | Lident _ | Uident _ ->
-      parse_jsx_opening_or_self_closing_element ~start_pos p
+      (parse_jsx_opening_or_self_closing_element ~start_pos p, [jsx_attr])
     | GreaterThan ->
       (* fragment: <> foo </> *)
-      parse_jsx_fragment p
-    | _ -> parse_jsx_name p
+      (parse_jsx_fragment start_pos p, [])
+    | _ -> (parse_jsx_name p, [])
   in
   Parser.eat_breadcrumb p;
-  {jsx_expr with pexp_attributes = [jsx_attr]}
+  {jsx_expr with pexp_attributes = jsx_attrs}
 
 (*
  * jsx-fragment ::=
  *  | <> </>
  *  | <> jsx-children </>
  *)
-and parse_jsx_fragment p =
+and parse_jsx_fragment start_pos p =
   let children_start_pos = p.Parser.start_pos in
   Parser.expect GreaterThan p;
   let _spread, children = parse_jsx_children p in
@@ -2720,8 +2720,11 @@ and parse_jsx_fragment p =
   Parser.expect LessThanSlash p;
   Scanner.pop_mode p.scanner Jsx;
   Parser.expect GreaterThan p;
-  let loc = mk_loc children_start_pos children_end_pos in
-  make_list_expression loc children None
+  let end_pos = p.Parser.start_pos in
+  (* location is from starting < till closing >  *)
+  let loc = mk_loc start_pos end_pos in
+  Ast_helper.Exp.jsx_fragment ~attrs:[] ~loc children_start_pos children
+    children_end_pos
 
 (*
  * jsx-prop ::=

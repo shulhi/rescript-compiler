@@ -208,6 +208,13 @@ module Exp : sig
   val open_ :
     ?loc:loc -> ?attrs:attrs -> override_flag -> lid -> expression -> expression
   val extension : ?loc:loc -> ?attrs:attrs -> extension -> expression
+  val jsx_fragment :
+    ?loc:loc ->
+    ?attrs:attrs ->
+    Lexing.position ->
+    expression list ->
+    Lexing.position ->
+    expression
 
   val case : pattern -> ?guard:expression -> expression -> case
 end

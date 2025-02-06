@@ -288,6 +288,7 @@ module E = struct
     let loc = sub.location sub loc in
     let attrs = sub.attributes sub attrs in
     match desc with
+    | Pexp_jsx_fragment _ -> failwith "TODO Pexp_jsx_fragment 4"
     | Pexp_ident x -> ident ~loc ~attrs (map_loc sub x)
     | Pexp_constant x -> constant ~loc ~attrs (map_constant x)
     | Pexp_let (r, vbs, e) ->

@@ -1523,8 +1523,59 @@ let transform_jsx_call ~config mapper call_expression call_arguments
       "JSX: `createElement` should be preceeded by a simple, direct module \
        name."
 
-let expr ~config mapper expression =
+let expr ~(config : Jsx_common.jsx_config) mapper expression =
   match expression with
+  | {
+   pexp_desc = Pexp_jsx_fragment (_, xs, _);
+   pexp_loc = loc;
+   pexp_attributes = attrs;
+  } ->
+    let loc = {loc with loc_ghost = true} in
+    let fragment =
+      match config.mode with
+      | "automatic" ->
+        Exp.ident ~loc {loc; txt = module_access_name config "jsxFragment"}
+      | "classic" | _ ->
+        Exp.ident ~loc {loc; txt = Ldot (Lident "React", "fragment")}
+    in
+    let record_of_children children =
+      Exp.record [(Location.mknoloc (Lident "children"), children, false)] None
+    in
+    let apply_jsx_array expr =
+      Exp.apply
+        (Exp.ident
+           {txt = module_access_name config "array"; loc = Location.none})
+        [(Nolabel, expr)]
+    in
+    let children_props =
+      match xs with
+      | [] -> empty_record ~loc:Location.none
+      | [child] -> record_of_children child
+      | _ -> (
+        match config.mode with
+        | "automatic" -> record_of_children @@ apply_jsx_array (Exp.array xs)
+        | "classic" | _ -> empty_record ~loc:Location.none)
+    in
+    let args =
+      (nolabel, fragment) :: (nolabel, children_props)
+      ::
+      (match config.mode with
+      | "classic" when List.length xs > 1 -> [(nolabel, Exp.array xs)]
+      | _ -> [])
+    in
+    Exp.apply ~loc ~attrs
+      (* ReactDOM.createElement *)
+      (match config.mode with
+      | "automatic" ->
+        if List.length xs > 1 then
+          Exp.ident ~loc {loc; txt = module_access_name config "jsxs"}
+        else Exp.ident ~loc {loc; txt = module_access_name config "jsx"}
+      | "classic" | _ ->
+        if List.length xs > 1 then
+          Exp.ident ~loc
+            {loc; txt = Ldot (Lident "React", "createElementVariadic")}
+        else Exp.ident ~loc {loc; txt = Ldot (Lident "React", "createElement")})
+      args
   (* Does the function application have the @JSX attribute? *)
   | {
    pexp_desc = Pexp_apply {funct = call_expression; args = call_arguments};
