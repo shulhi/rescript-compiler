@@ -1550,17 +1550,20 @@ let expr ~(config : Jsx_common.jsx_config) mapper expression =
     let children_props =
       match xs with
       | [] -> empty_record ~loc:Location.none
-      | [child] -> record_of_children child
+      | [child] -> record_of_children (mapper.expr mapper child)
       | _ -> (
         match config.mode with
-        | "automatic" -> record_of_children @@ apply_jsx_array (Exp.array xs)
+        | "automatic" ->
+          record_of_children
+          @@ apply_jsx_array (Exp.array (List.map (mapper.expr mapper) xs))
         | "classic" | _ -> empty_record ~loc:Location.none)
     in
     let args =
       (nolabel, fragment) :: (nolabel, children_props)
       ::
       (match config.mode with
-      | "classic" when List.length xs > 1 -> [(nolabel, Exp.array xs)]
+      | "classic" when List.length xs > 1 ->
+        [(nolabel, Exp.array (List.map (mapper.expr mapper) xs))]
       | _ -> [])
     in
     Exp.apply ~loc ~attrs
@@ -1600,7 +1603,8 @@ let expr ~(config : Jsx_common.jsx_config) mapper expression =
             ({txt = Lident "::"; loc}, Some {pexp_desc = Pexp_tuple _})
         | Pexp_construct ({txt = Lident "[]"; loc}, None) );
       pexp_attributes;
-    } as list_items -> (
+    } as list_items
+    when false -> (
     let jsx_attribute, non_jsx_attributes =
       List.partition
         (fun (attribute, _) -> attribute.txt = "JSX")
