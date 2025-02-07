@@ -217,6 +217,9 @@ module Exp : sig
     expression
 
   val case : pattern -> ?guard:expression -> expression -> case
+
+  val make_list_expression :
+    Location.t -> expression list -> expression option -> expression
 end
 
 (** Value declarations *)

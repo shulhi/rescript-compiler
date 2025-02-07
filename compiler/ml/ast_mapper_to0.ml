@@ -288,7 +288,15 @@ module E = struct
     let loc = sub.location sub loc in
     let attrs = sub.attributes sub attrs in
     match desc with
-    | Pexp_jsx_fragment _ -> failwith "TODO Pexp_jsx_fragment 4"
+    | Pexp_jsx_fragment (_, xs, _) ->
+      (* TODO: tweak location slightly *)
+      let list_expr = Ast_helper.Exp.make_list_expression loc xs None in
+      let mapped = sub.expr sub list_expr in
+      let jsx_attr =
+        sub.attribute sub (Location.mknoloc "JSX", Parsetree.PStr [])
+      in
+      {mapped with pexp_attributes = jsx_attr :: attrs}
+      (* failwith "TODO Pexp_jsx_fragment 4" *)
     | Pexp_ident x -> ident ~loc ~attrs (map_loc sub x)
     | Pexp_constant x -> constant ~loc ~attrs (map_constant x)
     | Pexp_let (r, vbs, e) ->
