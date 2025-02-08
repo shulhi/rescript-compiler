@@ -66,9 +66,7 @@ module Cite = {
 </div>
 
 let x =
-  <>
-    // before a
-    {a} // after a
-    // before b
-    {b} // after b
-  </>
+<>
+  {a}
+  {b}
+</>
