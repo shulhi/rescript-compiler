@@ -22,6 +22,12 @@
 - Fix `%external` extension. https://github.com/rescript-lang/rescript/pull/7272
 - Fix issue with type environment for unified ops. https://github.com/rescript-lang/rescript/pull/7277
 - Fix completion for application with tagged template. https://github.com/rescript-lang/rescript/pull/7278
+- Fix error message for arity in the presence of optional arguments. https://github.com/rescript-lang/rescript/pull/7284
+- Fix issue in functors with more than one argument (which are curried): emit nested function always. https://github.com/rescript-lang/rescript/pull/7273
+
+#### :house: Internal
+
+- Remove ignore in res_scanner.ml . https://github.com/rescript-lang/rescript/pull/7280
 
 # 12.0.0-alpha.8
 
