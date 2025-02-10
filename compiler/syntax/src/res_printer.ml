@@ -2782,7 +2782,8 @@ and print_expression ~state (e : Parsetree.expression) cmt_tbl =
     | Pexp_fun _ | Pexp_newtype _ -> print_arrow e
     | Parsetree.Pexp_constant c ->
       print_constant ~template_literal:(ParsetreeViewer.is_template_literal e) c
-    | Pexp_jsx_fragment (_, xs, _) -> print_jsx_fragment ~state xs cmt_tbl
+    | Pexp_jsx_fragment (o, xs, c) ->
+      print_jsx_fragment ~state o xs c e.pexp_loc cmt_tbl
     | Pexp_construct ({txt = Longident.Lident "()"}, _) -> Doc.text "()"
     | Pexp_construct ({txt = Longident.Lident "[]"}, _) ->
       Doc.concat
@@ -4401,9 +4402,20 @@ and print_jsx_expression ~state lident args cmt_tbl =
               ]);
        ])
 
-and print_jsx_fragment ~state (children : Parsetree.expression list) cmt_tbl =
-  let opening = Doc.text "<>" in
-  let closing = Doc.text "</>" in
+and print_jsx_fragment ~state (opening_greater_than : Lexing.position)
+    (children : Parsetree.expression list)
+    (closing_lesser_than : Lexing.position) (fragment_loc : Warnings.loc)
+    cmt_tbl =
+  let opening =
+    let loc : Location.t = {fragment_loc with loc_end = opening_greater_than} in
+    print_comments (Doc.text "<>") cmt_tbl loc
+  in
+  let closing =
+    let loc : Location.t =
+      {fragment_loc with loc_start = closing_lesser_than}
+    in
+    print_comments (Doc.text "</>") cmt_tbl loc
+  in
   let line_sep =
     if
       List.length children > 0
@@ -4423,9 +4435,12 @@ and print_jsx_fragment ~state (children : Parsetree.expression list) cmt_tbl =
                 [
                   Doc.line;
                   Doc.join ~sep:line_sep
-                       (List.map
-                          (fun e ->
-                            print_jsx_child ~spread:false ~state e ~cmt_tbl)
+                    (List.map
+                       (fun e ->
+                         let doc =
+                           print_jsx_child ~spread:false ~state e ~cmt_tbl
+                         in
+                         print_comments doc cmt_tbl e.pexp_loc)
                        children);
                 ]));
          line_sep;

@@ -2697,8 +2697,8 @@ and parse_jsx_fragment start_pos p =
   if p.token = LessThan then p.token <- Scanner.reconsider_less_than p.scanner;
   Parser.expect LessThanSlash p;
   Scanner.pop_mode p.scanner Jsx;
+  let end_pos = p.Parser.end_pos in
   Parser.expect GreaterThan p;
-  let end_pos = p.Parser.start_pos in
   (* location is from starting < till closing >  *)
   let loc = mk_loc start_pos end_pos in
   Ast_helper.Exp.jsx_fragment ~attrs:[] ~loc children_start_pos children
