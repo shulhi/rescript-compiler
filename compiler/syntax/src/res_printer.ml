@@ -4404,11 +4404,16 @@ and print_jsx_expression ~state lident args cmt_tbl =
 and print_jsx_fragment ~state (children : Parsetree.expression list) cmt_tbl =
   let opening = Doc.text "<>" in
   let closing = Doc.text "</>" in
-  let line_sep = if List.length children > 0 then Doc.hard_line else Doc.line in
+  let line_sep =
+    if
+      List.length children > 0
+      || List.exists ParsetreeViewer.is_jsx_expression children
+    then Doc.hard_line
+    else Doc.line
+  in
   Doc.group
     (Doc.concat
        [
-         line_sep;
          opening;
          (match children with
          | [] -> Doc.nil
@@ -4418,9 +4423,9 @@ and print_jsx_fragment ~state (children : Parsetree.expression list) cmt_tbl =
                 [
                   Doc.line;
                   Doc.join ~sep:line_sep
-                    (List.map
-                       (fun e ->
-                         print_jsx_child ~spread:false ~state e ~cmt_tbl)
+                       (List.map
+                          (fun e ->
+                            print_jsx_child ~spread:false ~state e ~cmt_tbl)
                        children);
                 ]));
          line_sep;

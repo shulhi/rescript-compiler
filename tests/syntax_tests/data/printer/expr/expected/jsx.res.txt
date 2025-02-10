@@ -99,8 +99,7 @@ let nav3 =
     </NavContent>
   </Nav>
 
-let avatarSection =
-<>
+let avatarSection = <>
   <div style={{"zIndex": "1", "opacity": opacityUser}}>
     <Avatar user={user} size={45} />
   </div>
@@ -122,7 +121,7 @@ let avatarSection =
     : React.nullElement}
 </>
 
-let x =  <> </>
+let x = <> </>
 
 let x =
   <div
@@ -315,7 +314,6 @@ let x = <MyComponent sidebar={<div> test </div>} nav={<Navbar />} />
 module App = {
   @react.component
   let make = () => {
-
     <>
       1
     </>
@@ -325,7 +323,6 @@ module App = {
 module App = {
   @react.component
   let make = () => {
-
     <>
       <div />
     </>
@@ -439,8 +436,7 @@ let x = <C> ...{() => msg->React.string} </C>
 
 let x = <C> ...{array->Array.map(React.string)} </C>
 
-let x =
-<>
+let x = <>
   {array->Array.map(React.string)}
 </>
 
@@ -455,8 +451,7 @@ let x = {
 }
 
 let x = {
-  let _ =
-  <>
+  let _ = <>
     {children}
   </>
   msg->React.string
