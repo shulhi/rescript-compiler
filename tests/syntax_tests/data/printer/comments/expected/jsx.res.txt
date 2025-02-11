@@ -65,7 +65,8 @@ module Cite = {
   React.string("Hello, World!")}
 </div>
 
-let x = <>
-  {a}
-  {b}
-</>
+let x =
+  <>
+    {a}
+    {b}
+  </>

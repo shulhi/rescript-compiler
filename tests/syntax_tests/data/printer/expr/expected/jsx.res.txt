@@ -99,27 +99,28 @@ let nav3 =
     </NavContent>
   </Nav>
 
-let avatarSection = <>
-  <div style={{"zIndex": "1", "opacity": opacityUser}}>
-    <Avatar user={user} size={45} />
-  </div>
-  {user.email !== viewer.email
-    ? <div
-        style={{
-          "marginLeft": marginLeft + "em",
-          "opacity": opacityAdmin,
-          "zIndex": "0",
-          "cursor": "pointer",
-        }}
-        onMouseEnter={_ => setHoveringAdmin(true)}
-        onMouseLeave={_ => setHoveringAdmin(false)}
-        onClick={_e => {
-          stopImpersonating(csrfToken)
-        }}>
-        <Avatar user={viewer} size={45} />
-      </div>
-    : React.nullElement}
-</>
+let avatarSection =
+  <>
+    <div style={{"zIndex": "1", "opacity": opacityUser}}>
+      <Avatar user={user} size={45} />
+    </div>
+    {user.email !== viewer.email
+      ? <div
+          style={{
+            "marginLeft": marginLeft + "em",
+            "opacity": opacityAdmin,
+            "zIndex": "0",
+            "cursor": "pointer",
+          }}
+          onMouseEnter={_ => setHoveringAdmin(true)}
+          onMouseLeave={_ => setHoveringAdmin(false)}
+          onClick={_e => {
+            stopImpersonating(csrfToken)
+          }}>
+          <Avatar user={viewer} size={45} />
+        </div>
+      : React.nullElement}
+  </>
 
 let x = <> </>
 
@@ -436,9 +437,10 @@ let x = <C> ...{() => msg->React.string} </C>
 
 let x = <C> ...{array->Array.map(React.string)} </C>
 
-let x = <>
-  {array->Array.map(React.string)}
-</>
+let x =
+  <>
+    {array->Array.map(React.string)}
+  </>
 
 let x = {
   let _ = <div />
@@ -451,9 +453,10 @@ let x = {
 }
 
 let x = {
-  let _ = <>
-    {children}
-  </>
+  let _ =
+    <>
+      {children}
+    </>
   msg->React.string
 }
 
