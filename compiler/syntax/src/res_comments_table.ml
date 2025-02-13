@@ -1031,6 +1031,7 @@ and walk_expression expr t comments =
     attach t.leading typexpr.ptyp_loc leading;
     walk_core_type typexpr t inside;
     attach t.trailing typexpr.ptyp_loc trailing
+  | Pexp_jsx_fragment (_, exprs, _) -> walk_list (exprs |> List.map (fun e -> Expression e)) t comments
   | Pexp_tuple []
   | Pexp_array []
   | Pexp_construct ({txt = Longident.Lident "[]"}, _) ->
