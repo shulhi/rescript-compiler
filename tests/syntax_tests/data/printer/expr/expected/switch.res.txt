@@ -50,6 +50,7 @@ switch route {
   </div>
 | B =>
   <>
+    // fragment tag moves to the next line
     <div> {React.string("First B div")} </div>
     <div> {React.string("Second B div")} </div>
   </>

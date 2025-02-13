@@ -1508,7 +1508,9 @@ and walk_expression expr t comments =
         attach t.leading return_expr.pexp_loc leading;
         walk_expression return_expr t inside;
         attach t.trailing return_expr.pexp_loc trailing)
-  | _ -> ()
+  | Pexp_jsx_fragment (_, exprs, _) ->
+    walk_list (exprs |> List.map (fun e -> Expression e)) t comments
+  | Pexp_send _ -> ()
 
 and walk_expr_parameter (_attrs, _argLbl, expr_opt, pattern) t comments =
   let leading, inside, trailing = partition_by_loc comments pattern.ppat_loc in
