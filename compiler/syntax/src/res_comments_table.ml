@@ -1508,8 +1508,18 @@ and walk_expression expr t comments =
         attach t.leading return_expr.pexp_loc leading;
         walk_expression return_expr t inside;
         attach t.trailing return_expr.pexp_loc trailing)
-  | Pexp_jsx_fragment (_, exprs, _) ->
-    walk_list (exprs |> List.map (fun e -> Expression e)) t comments
+  | Pexp_jsx_fragment (opening_greater_than, exprs, closing_lesser_than) ->
+    let opening_token = {expr.pexp_loc with loc_end = opening_greater_than} in
+    (* leading comments should be attached to the entire node *)
+    let _leading, trailing =
+      partition_leading_trailing comments opening_token
+    in
+    attach t.trailing opening_token trailing;
+    walk_list (exprs |> List.map (fun e -> Expression e)) t comments;
+    let closing_token = {expr.pexp_loc with loc_start = closing_lesser_than} in
+    let leading, trailing = partition_leading_trailing comments closing_token in
+    attach t.leading closing_token leading;
+    attach t.trailing closing_token trailing
   | Pexp_send _ -> ()
 
 and walk_expr_parameter (_attrs, _argLbl, expr_opt, pattern) t comments =
