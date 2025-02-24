@@ -63,5 +63,5 @@ let test = async () => 12
 let f = async () => (await test()) + 1
 
 module Fragments = {
-  let f1 = <></>
+  let f1 = <> </>
 }
