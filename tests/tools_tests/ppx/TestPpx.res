@@ -61,7 +61,3 @@ let eq2 = 3 === 3
 
 let test = async () => 12
 let f = async () => (await test()) + 1
-
-module Fragments = {
-  let f1 = <> </>
-}
