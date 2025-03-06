@@ -1507,12 +1507,19 @@ and walk_expression expr t comments =
         attach t.leading return_expr.pexp_loc leading;
         walk_expression return_expr t inside;
         attach t.trailing return_expr.pexp_loc trailing)
-  | Pexp_jsx_fragment (opening_greater_than, exprs, _closing_lesser_than) ->
+  | Pexp_jsx_fragment (opening_greater_than, children, _closing_lesser_than) ->
     let opening_token = {expr.pexp_loc with loc_end = opening_greater_than} in
     let on_same_line, rest = partition_by_on_same_line opening_token comments in
     attach t.trailing opening_token on_same_line;
+    let exprs =
+      match children with
+      | Parsetree.JSXChildrenSpreading e -> [e]
+      | Parsetree.JSXChildrenItems xs -> xs
+    in
     let xs = exprs |> List.map (fun e -> Expression e) in
     walk_list xs t rest
+  | Pexp_jsx_unary_element _ -> failwith "Pexp_jsx_unary_element 3"
+  | Pexp_jsx_container_element _ -> failwith "Pexp_jsx_container_element 3"
   | Pexp_send _ -> ()
 
 and walk_expr_parameter (_attrs, _argLbl, expr_opt, pattern) t comments =

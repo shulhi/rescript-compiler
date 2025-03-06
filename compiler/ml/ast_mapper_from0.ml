@@ -378,7 +378,10 @@ module E = struct
     | Pexp_construct ({txt = Longident.Lident "[]" | Longident.Lident "::"}, _)
       when attrs |> List.exists (fun ({txt}, _) -> txt = "JSX") ->
       let attrs = attrs |> List.filter (fun ({txt}, _) -> txt <> "JSX") in
-      jsx_fragment ~loc ~attrs loc.loc_start (map_jsx_list sub e) loc.loc_end
+      (* TODO: support spread *)
+      jsx_fragment ~loc ~attrs loc.loc_start
+        (Parsetree.JSXChildrenItems (map_jsx_list sub e))
+        loc.loc_end
     | Pexp_construct (lid, arg) -> (
       let lid1 = map_loc sub lid in
       let arg1 = map_opt (sub.expr sub) arg in

@@ -2783,8 +2783,15 @@ and print_expression ~state (e : Parsetree.expression) cmt_tbl =
     | Pexp_fun _ | Pexp_newtype _ -> print_arrow e
     | Parsetree.Pexp_constant c ->
       print_constant ~template_literal:(ParsetreeViewer.is_template_literal e) c
-    | Pexp_jsx_fragment (o, xs, c) ->
+    | Pexp_jsx_fragment (o, children, c) ->
+      let xs =
+        match children with
+        | JSXChildrenSpreading e -> [e]
+        | JSXChildrenItems xs -> xs
+      in
       print_jsx_fragment ~state o xs c e.pexp_loc cmt_tbl
+    | Pexp_jsx_unary_element _ -> failwith "Pexp_jsx_unary_element 4"
+    | Pexp_jsx_container_element _ -> failwith "Pexp_jsx_container_element 4"
     | Pexp_construct ({txt = Longident.Lident "()"}, _) -> Doc.text "()"
     | Pexp_construct ({txt = Longident.Lident "[]"}, _) ->
       Doc.concat
