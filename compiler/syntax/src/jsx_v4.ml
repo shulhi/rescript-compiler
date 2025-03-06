@@ -1530,10 +1530,61 @@ let transform_jsx_call ~config mapper call_expression call_arguments
       "JSX: `createElement` should be preceeded by a simple, direct module \
        name."
 
+let mkChildrenProps (config : Jsx_common.jsx_config) mapper
+    (children : jsx_children) =
+  let record_of_children children =
+    Exp.record [(Location.mknoloc (Lident "children"), children, false)] None
+  in
+  let apply_jsx_array expr =
+    Exp.apply
+      (Exp.ident {txt = module_access_name config "array"; loc = Location.none})
+      [(Nolabel, expr)]
+  in
+  match children with
+  | JSXChildrenItems [] -> empty_record ~loc:Location.none
+  | JSXChildrenItems [child] | JSXChildrenSpreading child ->
+    record_of_children (mapper.expr mapper child)
+  | JSXChildrenItems xs -> (
+    match config.mode with
+    | "automatic" ->
+      record_of_children
+      @@ apply_jsx_array (Exp.array (List.map (mapper.expr mapper) xs))
+    | "classic" | _ -> empty_record ~loc:Location.none)
+
+let mkReactCreateElement (config : Jsx_common.jsx_config) mapper loc attrs
+    (elementTag : expression) (children : jsx_children) : expression =
+  let more_than_one_children =
+    match children with
+    | JSXChildrenSpreading _ -> false
+    | JSXChildrenItems xs -> List.length xs > 1
+  in
+  let children_props = mkChildrenProps config mapper children in
+  let args =
+    (nolabel, elementTag) :: (nolabel, children_props)
+    ::
+    (match (config.mode, children) with
+    | "classic", JSXChildrenItems xs when more_than_one_children ->
+      [(nolabel, Exp.array (List.map (mapper.expr mapper) xs))]
+    | _ -> [])
+  in
+  Exp.apply ~loc ~attrs
+    (* ReactDOM.createElement *)
+    (match config.mode with
+    | "automatic" ->
+      if more_than_one_children then
+        Exp.ident ~loc {loc; txt = module_access_name config "jsxs"}
+      else Exp.ident ~loc {loc; txt = module_access_name config "jsx"}
+    | "classic" | _ ->
+      if more_than_one_children then
+        Exp.ident ~loc
+          {loc; txt = Ldot (Lident "React", "createElementVariadic")}
+      else Exp.ident ~loc {loc; txt = Ldot (Lident "React", "createElement")})
+    args
+
 let expr ~(config : Jsx_common.jsx_config) mapper expression =
   match expression with
   | {
-   pexp_desc = Pexp_jsx_fragment (_, xs, _);
+   pexp_desc = Pexp_jsx_fragment (_, children, _);
    pexp_loc = loc;
    pexp_attributes = attrs;
   } ->
@@ -1545,54 +1596,7 @@ let expr ~(config : Jsx_common.jsx_config) mapper expression =
       | "classic" | _ ->
         Exp.ident ~loc {loc; txt = Ldot (Lident "React", "fragment")}
     in
-    let record_of_children children =
-      Exp.record [(Location.mknoloc (Lident "children"), children, false)] None
-    in
-    let apply_jsx_array expr =
-      Exp.apply
-        (Exp.ident
-           {txt = module_access_name config "array"; loc = Location.none})
-        [(Nolabel, expr)]
-    in
-    let more_than_one_children =
-      match xs with
-      | JSXChildrenSpreading _ -> false
-      | JSXChildrenItems xs -> List.length xs > 1
-    in
-    let children_props =
-      match xs with
-      | JSXChildrenItems [] -> empty_record ~loc:Location.none
-      | JSXChildrenItems [child] | JSXChildrenSpreading child ->
-        record_of_children (mapper.expr mapper child)
-      | JSXChildrenItems xs -> (
-        match config.mode with
-        | "automatic" ->
-          record_of_children
-          @@ apply_jsx_array (Exp.array (List.map (mapper.expr mapper) xs))
-        | "classic" | _ -> empty_record ~loc:Location.none)
-    in
-    let args =
-      (nolabel, fragment) :: (nolabel, children_props)
-      ::
-      (match (config.mode, xs) with
-      | "classic", JSXChildrenItems xs when more_than_one_children ->
-        [(nolabel, Exp.array (List.map (mapper.expr mapper) xs))]
-      | _ -> [])
-    in
-
-    Exp.apply ~loc ~attrs
-      (* ReactDOM.createElement *)
-      (match config.mode with
-      | "automatic" ->
-        if more_than_one_children then
-          Exp.ident ~loc {loc; txt = module_access_name config "jsxs"}
-        else Exp.ident ~loc {loc; txt = module_access_name config "jsx"}
-      | "classic" | _ ->
-        if more_than_one_children then
-          Exp.ident ~loc
-            {loc; txt = Ldot (Lident "React", "createElementVariadic")}
-        else Exp.ident ~loc {loc; txt = Ldot (Lident "React", "createElement")})
-      args
+    mkReactCreateElement config mapper loc attrs fragment children
   (* Does the function application have the @JSX attribute? *)
   | {
    pexp_desc = Pexp_apply {funct = call_expression; args = call_arguments};
