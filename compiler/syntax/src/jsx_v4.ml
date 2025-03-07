@@ -1543,6 +1543,68 @@ let _starts_with_uppercase s =
     Char.uppercase_ascii c = c
 
 module AutomaticExpr = struct
+  let loc_from_prop = function
+    | JSXPropPunning (_, {loc}) -> loc
+    | JSXPropValue (_, _, {pexp_loc}) -> pexp_loc
+    | JSXPropSpreading (loc, _) -> loc
+
+  let mk_record_from_props (jsx_expr_loc : Location.t) (props : jsx_props) :
+      expression =
+    (* Create an artificial range from the first till the last prop *)
+    let loc =
+      match props with
+      | [] -> jsx_expr_loc
+      | head :: tail ->
+        let rec visit props =
+          match props with
+          | [] -> head
+          | [last] -> last
+          | _ :: rest -> visit rest
+        in
+        let first_item = head |> loc_from_prop in
+        let last_item = visit tail |> loc_from_prop in
+        {
+          loc_start = first_item.loc_start;
+          loc_end = last_item.loc_end;
+          loc_ghost = true;
+        }
+    in
+    (* key should be filtered out *)
+    let props =
+      props
+      |> List.filter (function
+           | JSXPropPunning (_, {txt = "key"})
+           | JSXPropValue ({txt = "key"}, _, _) ->
+             false
+           | _ -> true)
+    in
+    let props, spread_props =
+      match props with
+      | JSXPropSpreading (_, expr) :: rest -> (rest, Some expr)
+      | _ -> (props, None)
+    in
+
+    let record_fields =
+      props
+      |> List.map (function
+           | JSXPropPunning (is_optional, name) ->
+             ( {txt = Lident name.txt; loc = name.loc},
+               Exp.ident {txt = Lident name.txt; loc = name.loc},
+               is_optional )
+           | JSXPropValue (name, is_optional, value) ->
+             ({txt = Lident name.txt; loc = name.loc}, value, is_optional)
+           | JSXPropSpreading (loc, _) ->
+             (* There can only be one spread expression and it is expected to be the first prop *)
+             Jsx_common.raise_error ~loc
+               "JSX: use {...p} {x: v} not {x: v} {...p} \n\
+               \     multiple spreads {...p} {...p} not allowed.")
+    in
+    {
+      pexp_desc = Pexp_record (record_fields, spread_props);
+      pexp_loc = loc;
+      pexp_attributes = [];
+    }
+
   let mk_children_props (config : Jsx_common.jsx_config) mapper
       (children : jsx_children) =
     let record_of_children children =
@@ -1628,8 +1690,7 @@ module AutomaticExpr = struct
                 {loc = Location.none; txt = Ldot (element_binding, "jsxKeyed")},
               [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
         in
-        (* TODO *)
-        let props = empty_record ~loc in
+        let props = mk_record_from_props loc props in
 
         Exp.apply ~loc ~attrs jsx_expr
           ([(nolabel, component_name_expr); (nolabel, props)] @ key_and_unit)
