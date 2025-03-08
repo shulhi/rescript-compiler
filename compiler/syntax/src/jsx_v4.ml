@@ -1548,8 +1548,8 @@ module AutomaticExpr = struct
     | JSXPropValue (_, _, {pexp_loc}) -> pexp_loc
     | JSXPropSpreading (loc, _) -> loc
 
-  let mk_record_from_props (jsx_expr_loc : Location.t) (props : jsx_props) :
-      expression =
+  let mk_record_from_props mapper (jsx_expr_loc : Location.t)
+      (props : jsx_props) : expression =
     (* Create an artificial range from the first till the last prop *)
     let loc =
       match props with
@@ -1580,7 +1580,8 @@ module AutomaticExpr = struct
     in
     let props, spread_props =
       match props with
-      | JSXPropSpreading (_, expr) :: rest -> (rest, Some expr)
+      | JSXPropSpreading (_, expr) :: rest ->
+        (rest, Some (mapper.expr mapper expr))
       | _ -> (props, None)
     in
 
@@ -1592,7 +1593,9 @@ module AutomaticExpr = struct
                Exp.ident {txt = Lident name.txt; loc = name.loc},
                is_optional )
            | JSXPropValue (name, is_optional, value) ->
-             ({txt = Lident name.txt; loc = name.loc}, value, is_optional)
+             ( {txt = Lident name.txt; loc = name.loc},
+               mapper.expr mapper value,
+               is_optional )
            | JSXPropSpreading (loc, _) ->
              (* There can only be one spread expression and it is expected to be the first prop *)
              Jsx_common.raise_error ~loc
@@ -1694,7 +1697,7 @@ module AutomaticExpr = struct
                 {loc = Location.none; txt = Ldot (element_binding, "jsxKeyed")},
               [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
         in
-        let props = mk_record_from_props loc props in
+        let props = mk_record_from_props mapper loc props in
 
         Exp.apply ~loc ~attrs jsx_expr
           ([(nolabel, component_name_expr); (nolabel, props)] @ key_and_unit)
@@ -1718,13 +1721,111 @@ module AutomaticExpr = struct
                 },
               [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
         in
-        let props = mk_record_from_props loc props in
+        let props = mk_record_from_props mapper loc props in
         Exp.apply ~loc ~attrs jsx_expr
           ([(nolabel, make_id); (nolabel, props)] @ key_and_unit)
       else
         Jsx_common.raise_error ~loc
           "JSX: element name is neither upper- or lowercase, got \"%s\""
           (Longident.flatten tag_name.txt |> String.concat ".")
+    | {
+     pexp_desc =
+       Pexp_jsx_container_element
+         {
+           jsx_container_element_tag_name_start = tag_name;
+           jsx_container_element_props = props;
+           jsx_container_element_children = children;
+         };
+     pexp_loc = loc;
+     pexp_attributes = attrs;
+    } ->
+      let loc = {loc with loc_ghost = true} in
+      let name = Longident.flatten tag_name.txt |> String.concat "." in
+      (* For example: <div> <h1></h1> <br /> </div>
+         This has an impact if we want to use ReactDOM.jsx or ReactDOM.jsxs
+           *)
+      let has_multiple_literal_children =
+        match children with
+        | JSXChildrenItems (_ :: _ :: _) -> true
+        | _ -> false
+      in
+      if starts_with_lowercase name then
+        let component_name_expr = constant_string ~loc:tag_name.loc name in
+        let element_binding =
+          match config.module_ |> String.lowercase_ascii with
+          | "react" -> Lident "ReactDOM"
+          | _generic -> module_access_name config "Elements"
+        in
+        let props_record =
+          (* Append current props with JSXPropValue("children") 
+             This will later be transformed correctly into a record. *)
+          let props_with_children =
+            match children with
+            | JSXChildrenItems [] -> props
+            | JSXChildrenItems [expr] | JSXChildrenSpreading expr ->
+              props
+              @ [
+                  JSXPropValue
+                    ( {txt = "children"; loc = Location.none},
+                      true,
+                      Exp.apply
+                        (Exp.ident
+                           {
+                             txt = Ldot (element_binding, "someElement");
+                             loc = Location.none;
+                           })
+                        [(Nolabel, expr)] );
+                ]
+            | JSXChildrenItems xs ->
+              (* this is a hack to support react components that introspect into their children *)
+              props
+              @ [
+                  JSXPropValue
+                    ( {txt = "children"; loc = Location.none},
+                      false,
+                      Exp.apply
+                        (Exp.ident
+                           {
+                             txt = module_access_name config "array";
+                             loc = Location.none;
+                           })
+                        [
+                          (Nolabel, Exp.array (List.map (mapper.expr mapper) xs));
+                        ] );
+                ]
+          in
+          mk_record_from_props mapper loc props_with_children
+        in
+        let jsx_expr, key_and_unit =
+          match try_find_key_prop props with
+          | None ->
+            ( Exp.ident
+                {
+                  loc = Location.none;
+                  txt =
+                    Ldot
+                      ( element_binding,
+                        if has_multiple_literal_children then "jsxs" else "jsx"
+                      );
+                },
+              [] )
+          | Some key_prop ->
+            ( Exp.ident
+                {
+                  loc = Location.none;
+                  txt =
+                    Ldot
+                      ( element_binding,
+                        if has_multiple_literal_children then "jsxsKeyed"
+                        else "jsxKeyed" );
+                },
+              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
+        in
+
+        Exp.apply ~loc ~attrs jsx_expr
+          ([(nolabel, component_name_expr); (nolabel, props_record)]
+          @ key_and_unit)
+      else failwith "TODO"
     | e -> default_mapper.expr mapper e
 end
 
