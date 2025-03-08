@@ -1825,7 +1825,74 @@ module AutomaticExpr = struct
         Exp.apply ~loc ~attrs jsx_expr
           ([(nolabel, component_name_expr); (nolabel, props_record)]
           @ key_and_unit)
-      else failwith "TODO"
+      else if starts_with_uppercase name then
+        (* MyModule.make *)
+        let make_id =
+          Exp.ident ~loc:tag_name.loc
+            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
+        in
+        let props_record =
+          (* Append current props with JSXPropValue("children") 
+             This will later be transformed correctly into a record. *)
+          let props_with_children =
+            match children with
+            | JSXChildrenItems [] -> props
+            | JSXChildrenItems [expr] | JSXChildrenSpreading expr ->
+              props
+              @ [
+                  JSXPropValue
+                    ( {txt = "children"; loc = Location.none},
+                      false,
+                      mapper.expr mapper expr );
+                ]
+            | JSXChildrenItems xs ->
+              (* this is a hack to support react components that introspect into their children *)
+              props
+              @ [
+                  JSXPropValue
+                    ( {txt = "children"; loc = Location.none},
+                      false,
+                      Exp.apply
+                        (Exp.ident
+                           {
+                             txt = module_access_name config "array";
+                             loc = Location.none;
+                           })
+                        [
+                          (Nolabel, Exp.array (List.map (mapper.expr mapper) xs));
+                        ] );
+                ]
+          in
+          mk_record_from_props mapper loc props_with_children
+        in
+        let jsx_expr, key_and_unit =
+          match try_find_key_prop props with
+          | None ->
+            ( Exp.ident
+                {
+                  loc = Location.none;
+                  txt =
+                    module_access_name config
+                      (if has_multiple_literal_children then "jsxs" else "jsx");
+                },
+              [] )
+          | Some key_prop ->
+            ( Exp.ident
+                {
+                  loc = Location.none;
+                  txt =
+                    module_access_name config
+                      (if has_multiple_literal_children then "jsxsKeyed"
+                       else "jsxKeyed");
+                },
+              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
+        in
+        Exp.apply ~loc ~attrs jsx_expr
+          ([(nolabel, make_id); (nolabel, props_record)] @ key_and_unit)
+      else
+        Jsx_common.raise_error ~loc
+          "JSX: element name is neither upper- or lowercase, got \"%s\""
+          (Longident.flatten tag_name.txt |> String.concat ".")
     | e -> default_mapper.expr mapper e
 end
 
