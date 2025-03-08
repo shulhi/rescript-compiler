@@ -1536,7 +1536,7 @@ let starts_with_lowercase s =
     let c = s.[0] in
     Char.lowercase_ascii c = c
 
-let _starts_with_uppercase s =
+let starts_with_uppercase s =
   if String.length s = 0 then false
   else
     let c = s.[0] in
@@ -1666,14 +1666,18 @@ module AutomaticExpr = struct
     | {
      pexp_desc =
        Pexp_jsx_unary_element
-         {jsx_unary_element_tag_name = name; jsx_unary_element_props = props};
+         {
+           jsx_unary_element_tag_name = tag_name;
+           jsx_unary_element_props = props;
+         };
      pexp_loc = loc;
      pexp_attributes = attrs;
-    } -> (
-      match name.txt with
-      | Longident.Lident elementName when starts_with_lowercase elementName ->
+    } ->
+      let loc = {loc with loc_ghost = true} in
+      let name = Longident.flatten tag_name.txt |> String.concat "." in
+      if starts_with_lowercase name then
         (* For example 'input' *)
-        let component_name_expr = constant_string ~loc:name.loc elementName in
+        let component_name_expr = constant_string ~loc:tag_name.loc name in
         let element_binding =
           match config.module_ |> String.lowercase_ascii with
           | "react" -> Lident "ReactDOM"
@@ -1694,10 +1698,33 @@ module AutomaticExpr = struct
 
         Exp.apply ~loc ~attrs jsx_expr
           ([(nolabel, component_name_expr); (nolabel, props)] @ key_and_unit)
-      | _ ->
+      else if starts_with_uppercase name then
+        (* MyModule.make *)
+        let make_id =
+          Exp.ident ~loc:tag_name.loc
+            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
+        in
+        let jsx_expr, key_and_unit =
+          match try_find_key_prop props with
+          | None ->
+            ( Exp.ident
+                {loc = Location.none; txt = module_access_name config "jsx"},
+              [] )
+          | Some key_prop ->
+            ( Exp.ident
+                {
+                  loc = Location.none;
+                  txt = module_access_name config "jsxKeyed";
+                },
+              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
+        in
+        let props = mk_record_from_props loc props in
+        Exp.apply ~loc ~attrs jsx_expr
+          ([(nolabel, make_id); (nolabel, props)] @ key_and_unit)
+      else
         Jsx_common.raise_error ~loc
           "JSX: element name is neither upper- or lowercase, got \"%s\""
-          (Longident.flatten name.txt |> String.concat "."))
+          (Longident.flatten tag_name.txt |> String.concat ".")
     | e -> default_mapper.expr mapper e
 end
 
