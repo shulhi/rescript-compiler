@@ -1543,6 +1543,12 @@ let starts_with_uppercase s =
     Char.uppercase_ascii c = c
 
 module AutomaticExpr = struct
+  (* There appear to be slightly different rules of transformation whether the component is upper-, lowercase or a fragment *)
+  type componentDescription =
+    | LowercasedComponent
+    | UppercasedComponent
+    | FragmentComponent
+
   let loc_from_prop = function
     | JSXPropPunning (_, {loc}) -> loc
     | JSXPropValue (_, _, {pexp_loc}) -> pexp_loc
@@ -1608,39 +1614,55 @@ module AutomaticExpr = struct
       pexp_attributes = [];
     }
 
-  let mk_children_props (config : Jsx_common.jsx_config) mapper
-      (children : jsx_children) =
-    let record_of_children children =
-      Exp.record [(Location.mknoloc (Lident "children"), children, false)] None
-    in
-    let apply_jsx_array expr =
-      Exp.apply
-        (Exp.ident
-           {txt = module_access_name config "array"; loc = Location.none})
-        [(Nolabel, expr)]
-    in
+  let append_children_prop (config : Jsx_common.jsx_config) mapper
+      (component_description : componentDescription) (props : jsx_props)
+      (children : jsx_children) : jsx_props =
     match children with
-    | JSXChildrenItems [] -> empty_record ~loc:Location.none
+    | JSXChildrenItems [] -> props
     | JSXChildrenItems [child] | JSXChildrenSpreading child ->
-      record_of_children (mapper.expr mapper child)
+      let expr =
+        (* I don't quite know why fragment and uppercase don't do this additional ReactDOM.someElement wrapping *)
+        match component_description with
+        | FragmentComponent | UppercasedComponent -> mapper.expr mapper child
+        | LowercasedComponent ->
+          let element_binding =
+            match config.module_ |> String.lowercase_ascii with
+            | "react" -> Lident "ReactDOM"
+            | _generic -> module_access_name config "Elements"
+          in
+          Exp.apply
+            (Exp.ident
+               {
+                 txt = Ldot (element_binding, "someElement");
+                 loc = Location.none;
+               })
+            [(Nolabel, child)]
+      in
+      let is_optional =
+        match component_description with
+        | LowercasedComponent -> true
+        | FragmentComponent | UppercasedComponent -> false
+      in
+      props
+      @ [
+          JSXPropValue
+            ({txt = "children"; loc = Location.none}, is_optional, expr);
+        ]
     | JSXChildrenItems xs ->
-      record_of_children
-      @@ apply_jsx_array (Exp.array (List.map (mapper.expr mapper) xs))
-
-  let mk_react_jsx (config : Jsx_common.jsx_config) mapper loc attrs
-      (elementTag : expression) (children : jsx_children) : expression =
-    let more_than_one_children =
-      match children with
-      | JSXChildrenSpreading _ -> false
-      | JSXChildrenItems xs -> List.length xs > 1
-    in
-    let children_props = mk_children_props config mapper children in
-    let args = [(nolabel, elementTag); (nolabel, children_props)] in
-    Exp.apply ~loc ~attrs (* ReactDOM.jsx *)
-      (if more_than_one_children then
-         Exp.ident ~loc {loc; txt = module_access_name config "jsxs"}
-       else Exp.ident ~loc {loc; txt = module_access_name config "jsx"})
-      args
+      (* this is a hack to support react components that introspect into their children *)
+      props
+      @ [
+          JSXPropValue
+            ( {txt = "children"; loc = Location.none},
+              false,
+              Exp.apply
+                (Exp.ident
+                   {
+                     txt = module_access_name config "array";
+                     loc = Location.none;
+                   })
+                [(Nolabel, Exp.array (List.map (mapper.expr mapper) xs))] );
+        ]
 
   let try_find_key_prop (props : jsx_props) : (arg_label * expression) option =
     props
@@ -1654,6 +1676,56 @@ module AutomaticExpr = struct
            Some (arg_label, expr)
          | _ -> None)
 
+  let mk_react_jsx (config : Jsx_common.jsx_config) mapper loc attrs
+      (component_description : componentDescription) (elementTag : expression)
+      (props : jsx_props) (children : jsx_children) : expression =
+    let more_than_one_children =
+      match children with
+      | JSXChildrenSpreading _ -> false
+      | JSXChildrenItems xs -> List.length xs > 1
+    in
+    let props_with_children =
+      append_children_prop config mapper component_description props children
+    in
+    let props_record = mk_record_from_props mapper loc props_with_children in
+    let jsx_expr, key_and_unit =
+      let mk_element_bind (jsx_part : string) : Longident.t =
+        match component_description with
+        | FragmentComponent | UppercasedComponent ->
+          module_access_name config jsx_part
+        | LowercasedComponent ->
+          let element_binding =
+            match config.module_ |> String.lowercase_ascii with
+            | "react" -> Lident "ReactDOM"
+            | _generic -> module_access_name config "Elements"
+          in
+          Ldot (element_binding, jsx_part)
+      in
+      match try_find_key_prop props with
+      | None ->
+        ( Exp.ident
+            {
+              loc = Location.none;
+              txt =
+                mk_element_bind
+                  (if more_than_one_children then "jsxs" else "jsx");
+            },
+          [] )
+      | Some key_prop ->
+        ( Exp.ident
+            {
+              loc = Location.none;
+              txt =
+                mk_element_bind
+                  (if more_than_one_children then "jsxsKeyed" else "jsxKeyed");
+            },
+          [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
+    in
+    let args =
+      [(nolabel, elementTag); (nolabel, props_record)] @ key_and_unit
+    in
+    Exp.apply ~loc ~attrs jsx_expr args
+
   let expr ~(config : Jsx_common.jsx_config) mapper expression =
     match expression with
     | {
@@ -1665,7 +1737,8 @@ module AutomaticExpr = struct
       let fragment =
         Exp.ident ~loc {loc; txt = module_access_name config "jsxFragment"}
       in
-      mk_react_jsx config mapper loc attrs fragment children
+      mk_react_jsx config mapper loc attrs FragmentComponent fragment []
+        children
     | {
      pexp_desc =
        Pexp_jsx_unary_element
@@ -1681,49 +1754,16 @@ module AutomaticExpr = struct
       if starts_with_lowercase name then
         (* For example 'input' *)
         let component_name_expr = constant_string ~loc:tag_name.loc name in
-        let element_binding =
-          match config.module_ |> String.lowercase_ascii with
-          | "react" -> Lident "ReactDOM"
-          | _generic -> module_access_name config "Elements"
-        in
-        let jsx_expr, key_and_unit =
-          match try_find_key_prop props with
-          | None ->
-            ( Exp.ident
-                {loc = Location.none; txt = Ldot (element_binding, "jsx")},
-              [] )
-          | Some key_prop ->
-            ( Exp.ident
-                {loc = Location.none; txt = Ldot (element_binding, "jsxKeyed")},
-              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
-        in
-        let props = mk_record_from_props mapper loc props in
-
-        Exp.apply ~loc ~attrs jsx_expr
-          ([(nolabel, component_name_expr); (nolabel, props)] @ key_and_unit)
+        mk_react_jsx config mapper loc attrs LowercasedComponent
+          component_name_expr props (JSXChildrenItems [])
       else if starts_with_uppercase name then
         (* MyModule.make *)
         let make_id =
           Exp.ident ~loc:tag_name.loc
             {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
         in
-        let jsx_expr, key_and_unit =
-          match try_find_key_prop props with
-          | None ->
-            ( Exp.ident
-                {loc = Location.none; txt = module_access_name config "jsx"},
-              [] )
-          | Some key_prop ->
-            ( Exp.ident
-                {
-                  loc = Location.none;
-                  txt = module_access_name config "jsxKeyed";
-                },
-              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
-        in
-        let props = mk_record_from_props mapper loc props in
-        Exp.apply ~loc ~attrs jsx_expr
-          ([(nolabel, make_id); (nolabel, props)] @ key_and_unit)
+        mk_react_jsx config mapper loc attrs UppercasedComponent make_id props
+          (JSXChildrenItems [])
       else
         Jsx_common.raise_error ~loc
           "JSX: element name is neither upper- or lowercase, got \"%s\""
@@ -1744,151 +1784,18 @@ module AutomaticExpr = struct
       (* For example: <div> <h1></h1> <br /> </div>
          This has an impact if we want to use ReactDOM.jsx or ReactDOM.jsxs
            *)
-      let has_multiple_literal_children =
-        match children with
-        | JSXChildrenItems (_ :: _ :: _) -> true
-        | _ -> false
-      in
       if starts_with_lowercase name then
         let component_name_expr = constant_string ~loc:tag_name.loc name in
-        let element_binding =
-          match config.module_ |> String.lowercase_ascii with
-          | "react" -> Lident "ReactDOM"
-          | _generic -> module_access_name config "Elements"
-        in
-        let props_record =
-          (* Append current props with JSXPropValue("children") 
-             This will later be transformed correctly into a record. *)
-          let props_with_children =
-            match children with
-            | JSXChildrenItems [] -> props
-            | JSXChildrenItems [expr] | JSXChildrenSpreading expr ->
-              props
-              @ [
-                  JSXPropValue
-                    ( {txt = "children"; loc = Location.none},
-                      true,
-                      Exp.apply
-                        (Exp.ident
-                           {
-                             txt = Ldot (element_binding, "someElement");
-                             loc = Location.none;
-                           })
-                        [(Nolabel, expr)] );
-                ]
-            | JSXChildrenItems xs ->
-              (* this is a hack to support react components that introspect into their children *)
-              props
-              @ [
-                  JSXPropValue
-                    ( {txt = "children"; loc = Location.none},
-                      false,
-                      Exp.apply
-                        (Exp.ident
-                           {
-                             txt = module_access_name config "array";
-                             loc = Location.none;
-                           })
-                        [
-                          (Nolabel, Exp.array (List.map (mapper.expr mapper) xs));
-                        ] );
-                ]
-          in
-          mk_record_from_props mapper loc props_with_children
-        in
-        let jsx_expr, key_and_unit =
-          match try_find_key_prop props with
-          | None ->
-            ( Exp.ident
-                {
-                  loc = Location.none;
-                  txt =
-                    Ldot
-                      ( element_binding,
-                        if has_multiple_literal_children then "jsxs" else "jsx"
-                      );
-                },
-              [] )
-          | Some key_prop ->
-            ( Exp.ident
-                {
-                  loc = Location.none;
-                  txt =
-                    Ldot
-                      ( element_binding,
-                        if has_multiple_literal_children then "jsxsKeyed"
-                        else "jsxKeyed" );
-                },
-              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
-        in
-
-        Exp.apply ~loc ~attrs jsx_expr
-          ([(nolabel, component_name_expr); (nolabel, props_record)]
-          @ key_and_unit)
+        mk_react_jsx config mapper loc attrs LowercasedComponent
+          component_name_expr props children
       else if starts_with_uppercase name then
         (* MyModule.make *)
         let make_id =
           Exp.ident ~loc:tag_name.loc
             {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
         in
-        let props_record =
-          (* Append current props with JSXPropValue("children") 
-             This will later be transformed correctly into a record. *)
-          let props_with_children =
-            match children with
-            | JSXChildrenItems [] -> props
-            | JSXChildrenItems [expr] | JSXChildrenSpreading expr ->
-              props
-              @ [
-                  JSXPropValue
-                    ( {txt = "children"; loc = Location.none},
-                      false,
-                      mapper.expr mapper expr );
-                ]
-            | JSXChildrenItems xs ->
-              (* this is a hack to support react components that introspect into their children *)
-              props
-              @ [
-                  JSXPropValue
-                    ( {txt = "children"; loc = Location.none},
-                      false,
-                      Exp.apply
-                        (Exp.ident
-                           {
-                             txt = module_access_name config "array";
-                             loc = Location.none;
-                           })
-                        [
-                          (Nolabel, Exp.array (List.map (mapper.expr mapper) xs));
-                        ] );
-                ]
-          in
-          mk_record_from_props mapper loc props_with_children
-        in
-        let jsx_expr, key_and_unit =
-          match try_find_key_prop props with
-          | None ->
-            ( Exp.ident
-                {
-                  loc = Location.none;
-                  txt =
-                    module_access_name config
-                      (if has_multiple_literal_children then "jsxs" else "jsx");
-                },
-              [] )
-          | Some key_prop ->
-            ( Exp.ident
-                {
-                  loc = Location.none;
-                  txt =
-                    module_access_name config
-                      (if has_multiple_literal_children then "jsxsKeyed"
-                       else "jsxKeyed");
-                },
-              [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
-        in
-        Exp.apply ~loc ~attrs jsx_expr
-          ([(nolabel, make_id); (nolabel, props_record)] @ key_and_unit)
+        mk_react_jsx config mapper loc attrs UppercasedComponent make_id props
+          children
       else
         Jsx_common.raise_error ~loc
           "JSX: element name is neither upper- or lowercase, got \"%s\""

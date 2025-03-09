@@ -2653,11 +2653,7 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
             (Diagnostics.message msg);
           Parser.expect GreaterThan p
       in
-      failwith "Unsure how you can get here"
-    (* let loc = mk_loc children_start_pos children_end_pos in
-      match (spread, children) with
-      | true, child :: _ -> child
-      | _ -> Ast_helper.Exp.make_list_expression loc children None)) *)
+      Ast_helper.Exp.make_list_expression (mk_loc p.start_pos p.end_pos) [] None
     )
   | token ->
     Scanner.pop_mode p.scanner Jsx;
