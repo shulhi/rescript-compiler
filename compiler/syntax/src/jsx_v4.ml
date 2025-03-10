@@ -1889,10 +1889,81 @@ module ClassicExpr = struct
           [(nolabel, elementTag); (nolabel, props_expr)]
         | Some key_arg, JSXChildrenItems [], _ ->
           [key_arg; (nolabel, elementTag); (nolabel, props_expr)]
-        | _ ->
+        | None, (JSXChildrenItems [child] | JSXChildrenSpreading child), [] ->
           [
-            (labelled "props", props_expr);
             (nolabel, elementTag);
+            ( nolabel,
+              Exp.record
+                [
+                  ( {txt = Lident "children"; loc = child.pexp_loc},
+                    mapper.expr mapper child,
+                    false );
+                ]
+                None );
+          ]
+        | None, JSXChildrenItems (_ :: _ :: _), _ ->
+          (* This one is a bit absurd, but doing it anyway to have parity with the old code *)
+          [
+            (nolabel, elementTag);
+            ( nolabel,
+              mk_record_from_props mapper false loc
+                (props
+                @ [
+                    JSXPropValue
+                      ( {txt = "children"; loc = Location.none},
+                        false,
+                        Exp.ident
+                          {
+                            txt = Ldot (Lident "React", "null");
+                            loc = Location.none;
+                          } );
+                  ]) );
+            (nolabel, children_expr);
+          ]
+        | None, (JSXChildrenItems [_] | JSXChildrenSpreading _), props ->
+          [
+            (nolabel, elementTag);
+            ( nolabel,
+              mk_record_from_props mapper false loc
+                (props
+                @ [
+                    JSXPropValue
+                      ( {txt = "children"; loc = Location.none},
+                        false,
+                        children_expr );
+                  ]) );
+          ]
+        | Some key_arg, (JSXChildrenItems [_] | JSXChildrenSpreading _), _ ->
+          [
+            key_arg;
+            (nolabel, elementTag);
+            ( nolabel,
+              mk_record_from_props mapper true loc
+                (props
+                @ [
+                    JSXPropValue
+                      ( {txt = "children"; loc = Location.none},
+                        false,
+                        children_expr );
+                  ]) );
+          ]
+        | Some key_arg, JSXChildrenItems (_ :: _), _ ->
+          [
+            key_arg;
+            (nolabel, elementTag);
+            ( nolabel,
+              mk_record_from_props mapper true loc
+                (props
+                @ [
+                    JSXPropValue
+                      ( {txt = "children"; loc = Location.none},
+                        false,
+                        Exp.ident
+                          {
+                            txt = Ldot (Lident "React", "null");
+                            loc = Location.none;
+                          } );
+                  ]) );
             (nolabel, children_expr);
           ])
     in
@@ -1906,9 +1977,19 @@ module ClassicExpr = struct
       | LowercasedComponent ->
         Ldot (Lident "ReactDOM", "createDOMElementVariadic")
       | UppercasedComponent -> (
-        match key_arg_opt with
-        | None -> Ldot (Lident "React", "createElement")
-        | Some _ -> Ldot (Lident "JsxPPXReactSupport", "createElementWithKey"))
+        match (key_arg_opt, children) with
+        | ( None,
+            (JSXChildrenItems [] | JSXChildrenItems [_] | JSXChildrenSpreading _)
+          ) ->
+          Ldot (Lident "React", "createElement")
+        | None, JSXChildrenItems (_ :: _ :: _) ->
+          Ldot (Lident "React", "createElementVariadic")
+        | ( Some _,
+            (JSXChildrenItems [] | JSXChildrenItems [_] | JSXChildrenSpreading _)
+          ) ->
+          Ldot (Lident "JsxPPXReactSupport", "createElementWithKey")
+        | Some _, JSXChildrenItems (_ :: _) ->
+          Ldot (Lident "JsxPPXReactSupport", "createElementVariadicWithKey"))
     in
     Exp.apply ~loc ~attrs (Exp.ident ~loc {loc; txt = creatElement}) args
 
@@ -1945,9 +2026,10 @@ module ClassicExpr = struct
         mk_react_create_element mapper loc attrs LowercasedComponent
           component_name_expr props (JSXChildrenItems [])
       else if starts_with_uppercase name then
-        (* MyModule *)
+        (* MyModule.make *)
         let make_id =
-          Exp.ident ~loc:tag_name.loc {txt = tag_name.txt; loc = tag_name.loc}
+          Exp.ident ~loc:tag_name.loc
+            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
         in
         mk_react_create_element mapper loc attrs UppercasedComponent make_id
           props (JSXChildrenItems [])
@@ -1976,9 +2058,10 @@ module ClassicExpr = struct
         mk_react_create_element mapper loc attrs LowercasedComponent
           component_name_expr props children
       else if starts_with_uppercase name then
-        (* MyModule *)
+        (* MyModule.make *)
         let make_id =
-          Exp.ident ~loc:tag_name.loc {txt = tag_name.txt; loc = tag_name.loc}
+          Exp.ident ~loc:tag_name.loc
+            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
         in
         mk_react_create_element mapper loc attrs UppercasedComponent make_id
           props children
