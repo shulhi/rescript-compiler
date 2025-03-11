@@ -354,14 +354,12 @@ module E = struct
           jsx_container_element_opening_tag_end = ote;
           jsx_container_element_props = props;
           jsx_container_element_children = children;
-          jsx_container_element_closing_tag_start = cts;
-          jsx_container_element_tag_name_end = tag_name_end;
-          jsx_container_element_closing_tag_end = cte;
+          jsx_container_element_closing_tag = closing_tag;
         } ->
       jsx_container_element ~loc ~attrs (map_loc sub name)
         (map_jsx_props sub props) ote
         (map_jsx_children sub children)
-        cts (map_loc sub tag_name_end) cte
+        closing_tag
 end
 
 module P = struct

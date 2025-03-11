@@ -1232,6 +1232,7 @@ let completionWithParser1 ~currentFile ~debug ~offset ~path ~posCursor
                          then ValueOrField
                          else Value);
                     }))
+          (* todo: remove *)
         | Pexp_construct ({txt = Lident ("::" | "()")}, _) | Pexp_jsx_fragment _
           ->
           (* Ignore list expressions, used in JSX, unit, and more *) ()
@@ -1362,10 +1363,16 @@ let completionWithParser1 ~currentFile ~debug ~offset ~path ~posCursor
               | None -> "None"
               | Some childrenPosStart -> Pos.toString childrenPosStart);
           let jsxCompletable =
-            CompletionJsx.findJsxPropsCompletable ~jsxProps
-              ~endPos:(Loc.end_ expr.pexp_loc) ~posBeforeCursor
-              ~posAfterCompName:(Loc.end_ compName.loc)
-              ~firstCharBeforeCursorNoWhite ~charAtCursor
+            match expr.pexp_desc with
+            | Pexp_jsx_container_element
+                {jsx_container_element_closing_tag = None} ->
+              (* This is a weird edge case where there is no closing tag *)
+              None
+            | _ ->
+              CompletionJsx.findJsxPropsCompletable ~jsxProps
+                ~endPos:(Loc.end_ expr.pexp_loc) ~posBeforeCursor
+                ~posAfterCompName:(Loc.end_ compName.loc)
+                ~firstCharBeforeCursorNoWhite ~charAtCursor
           in
           if jsxCompletable <> None then setResultOpt jsxCompletable
           else if compName.loc |> Loc.hasPos ~pos:posBeforeCursor then

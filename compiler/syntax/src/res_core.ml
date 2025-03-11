@@ -2610,16 +2610,16 @@ and parse_jsx_opening_or_self_closing_element (* start of the opening < *)
       | LessThanSlash ->
         let pos = p.start_pos in
         Parser.next p;
-        pos
+        Some pos
       | LessThan ->
         let pos = p.start_pos in
         Parser.next p;
         Parser.expect Forwardslash p;
-        pos
-      | token when Grammar.is_structure_item_start token -> p.end_pos
+        Some pos
+      | token when Grammar.is_structure_item_start token -> None
       | _ ->
         Parser.expect LessThanSlash p;
-        p.end_pos
+        None
     in
     match p.Parser.token with
     | (Lident _ | Uident _) when verify_jsx_opening_closing_name p name ->
@@ -2628,14 +2628,24 @@ and parse_jsx_opening_or_self_closing_element (* start of the opening < *)
       let closing_tag_end = p.start_pos in
       Parser.expect GreaterThan p;
       let loc = mk_loc start_pos p.Parser.start_pos in
+      let closing_tag =
+        closing_tag_start
+        |> Option.map (fun closing_tag_start ->
+               {
+                 Parsetree.jsx_closing_container_tag_start = closing_tag_start;
+                 jsx_closing_container_tag_name = end_tag_name;
+                 jsx_closing_container_tag_end = closing_tag_end;
+               })
+      in
+
       Ast_helper.Exp.jsx_container_element ~loc name jsx_props opening_tag_end
-        children closing_tag_start end_tag_name closing_tag_end
+        children closing_tag
+      (*  end_tag_name  *)
       (* let loc = mk_loc children_start_pos children_end_pos in
       match (spread, children) with
       | true, child :: _ -> child
       | _ -> Ast_helper.Exp.make_list_expression loc children None) *)
     | token ->
-      let end_tag_name = {name with loc = mk_loc p.start_pos p.end_pos} in
       Scanner.pop_mode p.scanner Jsx;
       let () =
         if Grammar.is_structure_item_start token then
@@ -2654,8 +2664,7 @@ and parse_jsx_opening_or_self_closing_element (* start of the opening < *)
       in
       Ast_helper.Exp.jsx_container_element
         ~loc:(mk_loc start_pos p.prev_end_pos)
-        name jsx_props opening_tag_end children closing_tag_start end_tag_name
-        p.end_pos
+        name jsx_props opening_tag_end children None
     (* Ast_helper.Exp.make_list_expression (mk_loc p.start_pos p.end_pos) [] None *)
     )
   | token ->

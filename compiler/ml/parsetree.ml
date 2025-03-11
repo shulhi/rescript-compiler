@@ -340,11 +340,7 @@ and jsx_container_element = {
   jsx_container_element_opening_tag_end: Lexing.position;
   jsx_container_element_props: jsx_props;
   jsx_container_element_children: jsx_children;
-  (* </ *)
-  jsx_container_element_closing_tag_start: Lexing.position;
-  jsx_container_element_tag_name_end: Longident.t loc;
-  (* > *)
-  jsx_container_element_closing_tag_end: Lexing.position;
+  jsx_container_element_closing_tag: jsx_closing_container_tag option;
 }
 
 and jsx_prop =
@@ -369,6 +365,14 @@ and jsx_children =
   | JSXChildrenItems of expression list
 
 and jsx_props = jsx_prop list
+
+and jsx_closing_container_tag = {
+  (* </ *)
+  jsx_closing_container_tag_start: Lexing.position;
+  (* name *)
+  jsx_closing_container_tag_name: Longident.t loc; (* > *)
+  jsx_closing_container_tag_end: Lexing.position;
+}
 
 and case = {
   (* (P -> E) or (P when E0 -> E) *)

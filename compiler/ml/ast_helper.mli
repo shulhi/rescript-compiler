@@ -228,9 +228,7 @@ module Exp : sig
     Parsetree.jsx_props ->
     Lexing.position ->
     Parsetree.jsx_children ->
-    Lexing.position ->
-    Longident.t Location.loc ->
-    Lexing.position ->
+    Parsetree.jsx_closing_container_tag option ->
     expression
 
   val case : pattern -> ?guard:expression -> expression -> case

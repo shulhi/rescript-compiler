@@ -266,31 +266,44 @@ let command ~debug ~emitter ~path =
           jsx_container_element_tag_name_start = lident;
           jsx_container_element_opening_tag_end = posOfGreatherthanAfterProps;
           jsx_container_element_children = children;
-          jsx_container_element_closing_tag_start = closing_less_than;
-          jsx_container_element_tag_name_end = tag_name_end;
-          jsx_container_element_closing_tag_end = final_greather_than;
+          jsx_container_element_closing_tag = closing_tag_opt;
         } ->
-      ((* opening tag *)
-       emitter (* --> <div... *)
-       |> emitJsxTag ~debug ~name:"<" ~pos:(Loc.start e.pexp_loc);
-       emitter |> emitJsxOpen ~lid:lident.txt ~debug ~loc:lident.loc;
-       emitter (* <foo ...props > <-- *)
-       |> emitJsxTag ~debug ~name:">"
-            ~pos:(Pos.ofLexing posOfGreatherthanAfterProps);
+      (* opening tag *)
+      emitter (* --> <div... *)
+      |> emitJsxTag ~debug ~name:"<" ~pos:(Loc.start e.pexp_loc);
+      emitter |> emitJsxOpen ~lid:lident.txt ~debug ~loc:lident.loc;
+      emitter (* <foo ...props > <-- *)
+      |> emitJsxTag ~debug ~name:">"
+           ~pos:(Pos.ofLexing posOfGreatherthanAfterProps);
 
-       (* children *)
-       match children with
-       | Parsetree.JSXChildrenSpreading child -> iterator.expr iterator child
-       | Parsetree.JSXChildrenItems children ->
-         List.iter (iterator.expr iterator) children);
+      (* children *)
+      (match children with
+      | Parsetree.JSXChildrenSpreading child -> iterator.expr iterator child
+      | Parsetree.JSXChildrenItems children ->
+        List.iter (iterator.expr iterator) children);
 
       (* closing tag *)
-      emitter
-      |> emitJsxTag ~debug ~name:"</" ~pos:(Pos.ofLexing closing_less_than);
-      emitter
-      |> emitJsxClose ~debug ~lid:lident.txt ~pos:(Loc.start tag_name_end.loc);
-      emitter (* <foo> ... </foo> <-- *)
-      |> emitJsxTag ~debug ~name:">" ~pos:(Pos.ofLexing final_greather_than)
+      closing_tag_opt
+      |> Option.iter
+           (fun
+             {
+               (* </ *)
+               Parsetree.jsx_closing_container_tag_start = closing_less_than;
+               (* name *)
+               jsx_closing_container_tag_name = tag_name_end;
+               (* > *)
+               jsx_closing_container_tag_end = final_greather_than;
+             }
+           ->
+             emitter
+             |> emitJsxTag ~debug ~name:"</"
+                  ~pos:(Pos.ofLexing closing_less_than);
+             emitter
+             |> emitJsxClose ~debug ~lid:lident.txt
+                  ~pos:(Loc.start tag_name_end.loc);
+             emitter (* <foo> ... </foo> <-- *)
+             |> emitJsxTag ~debug ~name:">"
+                  ~pos:(Pos.ofLexing final_greather_than))
     | Pexp_apply
         {
           funct =
