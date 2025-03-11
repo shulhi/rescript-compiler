@@ -472,7 +472,7 @@ let extractJsxProps ~(compName : Longident.t Location.loc) ~props ~children =
              posStart = Loc.start name.loc;
              posEnd = Loc.end_ name.loc;
              exp =
-               Ast_helper.Exp.ident
+               Ast_helper.Exp.ident ~loc:name.loc
                  {txt = Longident.Lident name.txt; loc = name.loc};
            }
          | JSXPropValue (name, _, value) ->

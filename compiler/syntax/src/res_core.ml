@@ -2641,7 +2641,7 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
           Parser.expect GreaterThan p
       in
       Ast_helper.Exp.jsx_container_element
-        ~loc:(mk_loc jsx_start_pos p.end_pos)
+        ~loc:(mk_loc jsx_start_pos p.prev_end_pos)
         name jsx_props children
     (* Ast_helper.Exp.make_list_expression (mk_loc p.start_pos p.end_pos) [] None *)
     )
@@ -2649,7 +2649,7 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
     Scanner.pop_mode p.scanner Jsx;
     Parser.err p (Diagnostics.unexpected token p.breadcrumbs);
     Ast_helper.Exp.jsx_unary_element
-      ~loc:(mk_loc jsx_start_pos p.end_pos)
+      ~loc:(mk_loc jsx_start_pos p.prev_end_pos)
       name jsx_props
 
 (* and parse_jsx_opening_or_self_closing_element_old ~start_pos p =
