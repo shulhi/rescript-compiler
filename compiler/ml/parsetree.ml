@@ -336,12 +336,15 @@ and jsx_unary_element = {
 and jsx_container_element = {
   (* jsx_container_element_opening_tag_start: Lexing.position; *)
   jsx_container_element_tag_name_start: Longident.t loc;
-  (* jsx_container_element_opening_tag_end: Lexing.position; *)
+  (* > *)
+  jsx_container_element_opening_tag_end: Lexing.position;
   jsx_container_element_props: jsx_props;
   jsx_container_element_children: jsx_children;
-      (* jsx_container_element_closing_tag_start: Lexing.position; *)
-      (* jsx_container_element_tag_name_end: string loc; *)
-      (* jsx_container_element_closing_tag_end: Lexing.position; *)
+  (* </ *)
+  jsx_container_element_closing_tag_start: Lexing.position;
+  jsx_container_element_tag_name_end: Longident.t loc;
+  (* > *)
+  jsx_container_element_closing_tag_end: Lexing.position;
 }
 
 and jsx_prop =

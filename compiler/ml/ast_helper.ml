@@ -187,13 +187,17 @@ module Exp = struct
       (Pexp_jsx_unary_element
          {jsx_unary_element_tag_name = a; jsx_unary_element_props = b})
 
-  let jsx_container_element ?loc ?attrs a b c =
+  let jsx_container_element ?loc ?attrs a b c d e f g =
     mk ?loc ?attrs
       (Pexp_jsx_container_element
          {
            jsx_container_element_tag_name_start = a;
            jsx_container_element_props = b;
-           jsx_container_element_children = c;
+           jsx_container_element_opening_tag_end = c;
+           jsx_container_element_children = d;
+           jsx_container_element_closing_tag_start = e;
+           jsx_container_element_tag_name_end = f;
+           jsx_container_element_closing_tag_end = g;
          })
 
   let case lhs ?guard rhs = {pc_lhs = lhs; pc_guard = guard; pc_rhs = rhs}

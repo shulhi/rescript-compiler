@@ -2582,9 +2582,8 @@ and parse_jsx_name p : Longident.t Location.loc =
 (* in
   Ast_helper.Exp.ident ~loc:longident.loc longident *)
 
-and parse_jsx_opening_or_self_closing_element ~start_pos p :
-    Parsetree.expression =
-  let jsx_start_pos = p.Parser.start_pos in
+and parse_jsx_opening_or_self_closing_element (* start of the opening < *)
+    ~start_pos p : Parsetree.expression =
   let name = parse_jsx_name p in
   let jsx_props = parse_jsx_props p in
   match p.Parser.token with
@@ -2594,36 +2593,49 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
     Parser.next p;
     (* let children_end_pos = p.Parser.start_pos in *)
     Scanner.pop_mode p.scanner Jsx;
+    let jsx_end_pos = p.end_pos in
     Parser.expect GreaterThan p;
-    let loc = mk_loc jsx_start_pos p.Parser.start_pos in
+    let loc = mk_loc start_pos jsx_end_pos in
     (* Ast_helper.Exp.make_list_expression loc [] None no children *)
     Ast_helper.Exp.jsx_unary_element ~loc name jsx_props
   | GreaterThan -> (
     (* <foo a=b> bar </foo> *)
     (* let children_start_pos = p.Parser.start_pos in *)
+    let opening_tag_end = p.Parser.start_pos in
     Parser.next p;
     let children = parse_jsx_children p in
     (* let children_end_pos = p.Parser.start_pos in *)
-    let () =
+    let closing_tag_start =
       match p.token with
-      | LessThanSlash -> Parser.next p
-      | LessThan ->
+      | LessThanSlash ->
+        let pos = p.start_pos in
         Parser.next p;
-        Parser.expect Forwardslash p
-      | token when Grammar.is_structure_item_start token -> ()
-      | _ -> Parser.expect LessThanSlash p
+        pos
+      | LessThan ->
+        let pos = p.start_pos in
+        Parser.next p;
+        Parser.expect Forwardslash p;
+        pos
+      | token when Grammar.is_structure_item_start token -> p.end_pos
+      | _ ->
+        Parser.expect LessThanSlash p;
+        p.end_pos
     in
     match p.Parser.token with
     | (Lident _ | Uident _) when verify_jsx_opening_closing_name p name ->
+      let end_tag_name = {name with loc = mk_loc p.start_pos p.end_pos} in
       Scanner.pop_mode p.scanner Jsx;
+      let closing_tag_end = p.start_pos in
       Parser.expect GreaterThan p;
-      let loc = mk_loc jsx_start_pos p.Parser.start_pos in
-      Ast_helper.Exp.jsx_container_element ~loc name jsx_props children
+      let loc = mk_loc start_pos p.Parser.start_pos in
+      Ast_helper.Exp.jsx_container_element ~loc name jsx_props opening_tag_end
+        children closing_tag_start end_tag_name closing_tag_end
       (* let loc = mk_loc children_start_pos children_end_pos in
       match (spread, children) with
       | true, child :: _ -> child
       | _ -> Ast_helper.Exp.make_list_expression loc children None) *)
     | token ->
+      let end_tag_name = {name with loc = mk_loc p.start_pos p.end_pos} in
       Scanner.pop_mode p.scanner Jsx;
       let () =
         if Grammar.is_structure_item_start token then
@@ -2641,15 +2653,16 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
           Parser.expect GreaterThan p
       in
       Ast_helper.Exp.jsx_container_element
-        ~loc:(mk_loc jsx_start_pos p.prev_end_pos)
-        name jsx_props children
+        ~loc:(mk_loc start_pos p.prev_end_pos)
+        name jsx_props opening_tag_end children closing_tag_start end_tag_name
+        p.end_pos
     (* Ast_helper.Exp.make_list_expression (mk_loc p.start_pos p.end_pos) [] None *)
     )
   | token ->
     Scanner.pop_mode p.scanner Jsx;
     Parser.err p (Diagnostics.unexpected token p.breadcrumbs);
     Ast_helper.Exp.jsx_unary_element
-      ~loc:(mk_loc jsx_start_pos p.prev_end_pos)
+      ~loc:(mk_loc start_pos p.prev_end_pos)
       name jsx_props
 
 (* and parse_jsx_opening_or_self_closing_element_old ~start_pos p =

@@ -226,7 +226,11 @@ module Exp : sig
     ?attrs:attrs ->
     Longident.t Location.loc ->
     Parsetree.jsx_props ->
+    Lexing.position ->
     Parsetree.jsx_children ->
+    Lexing.position ->
+    Longident.t Location.loc ->
+    Lexing.position ->
     expression
 
   val case : pattern -> ?guard:expression -> expression -> case
