@@ -145,7 +145,6 @@ module InExternal = struct
   let status = ref false
 end
 
-(* let jsx_attr = (Location.mknoloc "JSX", Parsetree.PStr []) *)
 let ternary_attr = (Location.mknoloc "res.ternary", Parsetree.PStr [])
 let if_let_attr = (Location.mknoloc "res.iflet", Parsetree.PStr [])
 let make_await_attr loc = (Location.mkloc "res.await" loc, Parsetree.PStr [])
@@ -2598,11 +2597,7 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
     Parser.expect GreaterThan p;
     let loc = mk_loc jsx_start_pos p.Parser.start_pos in
     (* Ast_helper.Exp.make_list_expression loc [] None no children *)
-    let desc =
-      Parsetree.Pexp_jsx_unary_element
-        {jsx_unary_element_tag_name = name; jsx_unary_element_props = jsx_props}
-    in
-    {pexp_desc = desc; pexp_loc = loc; pexp_attributes = []}
+    Ast_helper.Exp.jsx_unary_element ~loc name jsx_props
   | GreaterThan -> (
     (* <foo a=b> bar </foo> *)
     (* let children_start_pos = p.Parser.start_pos in *)
@@ -2623,15 +2618,7 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
       Scanner.pop_mode p.scanner Jsx;
       Parser.expect GreaterThan p;
       let loc = mk_loc jsx_start_pos p.Parser.start_pos in
-      let desc =
-        Parsetree.Pexp_jsx_container_element
-          {
-            jsx_container_element_tag_name_start = name;
-            jsx_container_element_props = jsx_props;
-            jsx_container_element_children = children;
-          }
-      in
-      {pexp_desc = desc; pexp_loc = loc; pexp_attributes = []}
+      Ast_helper.Exp.jsx_container_element ~loc name jsx_props children
       (* let loc = mk_loc children_start_pos children_end_pos in
       match (spread, children) with
       | true, child :: _ -> child
@@ -2653,12 +2640,17 @@ and parse_jsx_opening_or_self_closing_element ~start_pos p :
             (Diagnostics.message msg);
           Parser.expect GreaterThan p
       in
-      Ast_helper.Exp.make_list_expression (mk_loc p.start_pos p.end_pos) [] None
+      Ast_helper.Exp.jsx_container_element
+        ~loc:(mk_loc jsx_start_pos p.end_pos)
+        name jsx_props children
+    (* Ast_helper.Exp.make_list_expression (mk_loc p.start_pos p.end_pos) [] None *)
     )
   | token ->
     Scanner.pop_mode p.scanner Jsx;
     Parser.err p (Diagnostics.unexpected token p.breadcrumbs);
-    Ast_helper.Exp.make_list_expression Location.none [] None
+    Ast_helper.Exp.jsx_unary_element
+      ~loc:(mk_loc jsx_start_pos p.end_pos)
+      name jsx_props
 
 (* and parse_jsx_opening_or_self_closing_element_old ~start_pos p =
   let jsx_start_pos = p.Parser.start_pos in

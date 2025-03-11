@@ -3420,9 +3420,8 @@ and print_expression ~state (e : Parsetree.expression) cmt_tbl =
     | Pexp_ifthenelse _ ->
       true
     | Pexp_match _ when ParsetreeViewer.is_if_let_expr e -> true
-    | Pexp_jsx_fragment _ -> true
-    | Pexp_construct _ when ParsetreeViewer.has_jsx_attribute e.pexp_attributes
-      ->
+    | Pexp_jsx_fragment _ | Pexp_jsx_unary_element _
+    | Pexp_jsx_container_element _ ->
       true
     | _ -> false
   in

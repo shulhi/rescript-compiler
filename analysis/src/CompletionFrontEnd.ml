@@ -1325,10 +1325,27 @@ let completionWithParser1 ~currentFile ~debug ~offset ~path ~posCursor
                         inJsx = !inJsxContext;
                       }))
             | None -> ())
-        | Pexp_apply {funct = {pexp_desc = Pexp_ident compName}; args}
-          when Res_parsetree_viewer.is_jsx_expression expr ->
+        | Pexp_jsx_unary_element
+            {
+              jsx_unary_element_tag_name = compName;
+              jsx_unary_element_props = props;
+            }
+        | Pexp_jsx_container_element
+            {
+              jsx_container_element_tag_name_start = compName;
+              jsx_container_element_props = props;
+            } ->
           inJsxContext := true;
-          let jsxProps = CompletionJsx.extractJsxProps ~compName ~args in
+          let children =
+            match expr.pexp_desc with
+            | Pexp_jsx_container_element
+                {jsx_container_element_children = children} ->
+              children
+            | _ -> JSXChildrenItems []
+          in
+          let jsxProps =
+            CompletionJsx.extractJsxProps ~compName ~props ~children
+          in
           let compNamePath = flattenLidCheckDot ~jsx:true compName in
           if debug then
             Printf.printf "JSX <%s:%s %s> _children:%s\n"
