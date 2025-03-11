@@ -10,8 +10,6 @@ let module_access_name config value =
 
 let nolabel = Nolabel
 
-let labelled str = Labelled {txt = str; loc = Location.none}
-
 let is_optional str =
   match str with
   | Optional _ -> true
@@ -33,9 +31,6 @@ let get_label str =
 
 let constant_string ~loc str =
   Ast_helper.Exp.constant ~loc (Pconst_string (str, None))
-
-(* {} empty record *)
-let empty_record ~loc = Exp.record ~loc [] None
 
 let unit_expr ~loc = Exp.construct ~loc (Location.mkloc (Lident "()") loc) None
 
@@ -1194,454 +1189,167 @@ let try_find_key_prop (props : jsx_props) : (arg_label * expression) option =
          Some (arg_label, expr)
        | _ -> None)
 
-module AutomaticExpr = struct
-  let append_children_prop (config : Jsx_common.jsx_config) mapper
-      (component_description : componentDescription) (props : jsx_props)
-      (children : jsx_children) : jsx_props =
-    match children with
-    | JSXChildrenItems [] -> props
-    | JSXChildrenItems [child] | JSXChildrenSpreading child ->
-      let expr =
-        (* I don't quite know why fragment and uppercase don't do this additional ReactDOM.someElement wrapping *)
-        match component_description with
-        | FragmentComponent | UppercasedComponent -> mapper.expr mapper child
-        | LowercasedComponent ->
-          let element_binding =
-            match config.module_ |> String.lowercase_ascii with
-            | "react" -> Lident "ReactDOM"
-            | _generic -> module_access_name config "Elements"
-          in
-          Exp.apply
-            (Exp.ident
-               {
-                 txt = Ldot (element_binding, "someElement");
-                 loc = Location.none;
-               })
-            [(Nolabel, child)]
-      in
-      let is_optional =
-        match component_description with
-        | LowercasedComponent -> true
-        | FragmentComponent | UppercasedComponent -> false
-      in
-      props
-      @ [
-          JSXPropValue
-            ({txt = "children"; loc = Location.none}, is_optional, expr);
-        ]
-    | JSXChildrenItems xs ->
-      (* this is a hack to support react components that introspect into their children *)
-      props
-      @ [
-          JSXPropValue
-            ( {txt = "children"; loc = Location.none},
-              false,
-              Exp.apply
-                (Exp.ident
-                   {
-                     txt = module_access_name config "array";
-                     loc = Location.none;
-                   })
-                [(Nolabel, Exp.array (List.map (mapper.expr mapper) xs))] );
-        ]
-
-  let mk_react_jsx (config : Jsx_common.jsx_config) mapper loc attrs
-      (component_description : componentDescription) (elementTag : expression)
-      (props : jsx_props) (children : jsx_children) : expression =
-    let more_than_one_children =
-      match children with
-      | JSXChildrenSpreading _ -> false
-      | JSXChildrenItems xs -> List.length xs > 1
-    in
-    let props_with_children =
-      append_children_prop config mapper component_description props children
-    in
-    let props_record =
-      mk_record_from_props mapper true loc props_with_children
-    in
-    let jsx_expr, key_and_unit =
-      let mk_element_bind (jsx_part : string) : Longident.t =
-        match component_description with
-        | FragmentComponent | UppercasedComponent ->
-          module_access_name config jsx_part
-        | LowercasedComponent ->
-          let element_binding =
-            match config.module_ |> String.lowercase_ascii with
-            | "react" -> Lident "ReactDOM"
-            | _generic -> module_access_name config "Elements"
-          in
-          Ldot (element_binding, jsx_part)
-      in
-      match try_find_key_prop props with
-      | None ->
-        ( Exp.ident
-            {
-              loc = Location.none;
-              txt =
-                mk_element_bind
-                  (if more_than_one_children then "jsxs" else "jsx");
-            },
-          [] )
-      | Some key_prop ->
-        ( Exp.ident
-            {
-              loc = Location.none;
-              txt =
-                mk_element_bind
-                  (if more_than_one_children then "jsxsKeyed" else "jsxKeyed");
-            },
-          [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
-    in
-    let args =
-      [(nolabel, elementTag); (nolabel, props_record)] @ key_and_unit
-    in
-    Exp.apply ~loc ~attrs jsx_expr args
-
-  let expr ~(config : Jsx_common.jsx_config) mapper expression =
-    match expression with
-    | {
-     pexp_desc = Pexp_jsx_fragment (_, children, _);
-     pexp_loc = loc;
-     pexp_attributes = attrs;
-    } ->
-      let loc = {loc with loc_ghost = true} in
-      let fragment =
-        Exp.ident ~loc {loc; txt = module_access_name config "jsxFragment"}
-      in
-      mk_react_jsx config mapper loc attrs FragmentComponent fragment []
-        children
-    | {
-     pexp_desc =
-       Pexp_jsx_unary_element
-         {
-           jsx_unary_element_tag_name = tag_name;
-           jsx_unary_element_props = props;
-         };
-     pexp_loc = loc;
-     pexp_attributes = attrs;
-    } ->
-      let loc = {loc with loc_ghost = true} in
-      let name = Longident.flatten tag_name.txt |> String.concat "." in
-      if starts_with_lowercase name then
-        (* For example 'input' *)
-        let component_name_expr = constant_string ~loc:tag_name.loc name in
-        mk_react_jsx config mapper loc attrs LowercasedComponent
-          component_name_expr props (JSXChildrenItems [])
-      else if starts_with_uppercase name then
-        (* MyModule.make *)
-        let make_id =
-          Exp.ident ~loc:tag_name.loc
-            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
-        in
-        mk_react_jsx config mapper loc attrs UppercasedComponent make_id props
-          (JSXChildrenItems [])
-      else
-        Jsx_common.raise_error ~loc
-          "JSX: element name is neither upper- or lowercase, got \"%s\""
-          (Longident.flatten tag_name.txt |> String.concat ".")
-    | {
-     pexp_desc =
-       Pexp_jsx_container_element
-         {
-           jsx_container_element_tag_name_start = tag_name;
-           jsx_container_element_props = props;
-           jsx_container_element_children = children;
-         };
-     pexp_loc = loc;
-     pexp_attributes = attrs;
-    } ->
-      let loc = {loc with loc_ghost = true} in
-      let name = Longident.flatten tag_name.txt |> String.concat "." in
-      (* For example: <div> <h1></h1> <br /> </div>
-         This has an impact if we want to use ReactDOM.jsx or ReactDOM.jsxs
-           *)
-      if starts_with_lowercase name then
-        let component_name_expr = constant_string ~loc:tag_name.loc name in
-        mk_react_jsx config mapper loc attrs LowercasedComponent
-          component_name_expr props children
-      else if starts_with_uppercase name then
-        (* MyModule.make *)
-        let make_id =
-          Exp.ident ~loc:tag_name.loc
-            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
-        in
-        mk_react_jsx config mapper loc attrs UppercasedComponent make_id props
-          children
-      else
-        Jsx_common.raise_error ~loc
-          "JSX: element name is neither upper- or lowercase, got \"%s\""
-          (Longident.flatten tag_name.txt |> String.concat ".")
-    | e -> default_mapper.expr mapper e
-end
-
-module ClassicExpr = struct
-  let mk_react_create_element mapper loc attrs
-      (component_description : componentDescription) (elementTag : expression)
-      (props : jsx_props) (children : jsx_children) : expression =
-    let more_than_one_children =
-      match children with
-      | JSXChildrenSpreading _ -> false
-      | JSXChildrenItems xs -> List.length xs > 1
-    in
-    let key_arg_opt = try_find_key_prop props in
-    (* children are a separate argument in React.createElement *)
-    let props_expr =
+let append_children_prop (config : Jsx_common.jsx_config) mapper
+    (component_description : componentDescription) (props : jsx_props)
+    (children : jsx_children) : jsx_props =
+  match children with
+  | JSXChildrenItems [] -> props
+  | JSXChildrenItems [child] | JSXChildrenSpreading child ->
+    let expr =
+      (* I don't quite know why fragment and uppercase don't do this additional ReactDOM.someElement wrapping *)
       match component_description with
-      | FragmentComponent -> empty_record ~loc:Location.none
-      | LowercasedComponent -> mk_record_from_props mapper false loc props
-      | UppercasedComponent -> mk_record_from_props mapper true loc props
-    in
-    let children_expr =
-      match children with
-      | JSXChildrenItems [] -> Exp.array []
-      | JSXChildrenItems [child] | JSXChildrenSpreading child -> (
-        match component_description with
-        | LowercasedComponent -> Exp.array [mapper.expr mapper child]
-        | _ -> mapper.expr mapper child)
-      | JSXChildrenItems (_ :: _ :: _ as xs) ->
-        Exp.array (List.map (mapper.expr mapper) xs)
-    in
-    let args =
-      match component_description with
-      | FragmentComponent -> (
-        match children with
-        | JSXChildrenItems [] -> [(nolabel, elementTag); (nolabel, props_expr)]
-        | JSXChildrenItems [child] | JSXChildrenSpreading child ->
-          [
-            (nolabel, elementTag);
-            ( nolabel,
-              Exp.record
-                [
-                  ( {txt = Lident "children"; loc = child.pexp_loc},
-                    mapper.expr mapper child,
-                    false );
-                ]
-                None );
-          ]
-        | _ ->
-          [
-            (nolabel, elementTag);
-            (* empty record for props *)
-            (nolabel, props_expr);
-            (* multiple children should have a separte argument *)
-            (nolabel, children_expr);
-          ])
-      | LowercasedComponent -> (
-        match (children, props) with
-        | JSXChildrenItems [], [] ->
-          [(nolabel, elementTag); (nolabel, Exp.array [])]
-        | (JSXChildrenItems [child] | JSXChildrenSpreading child), [] ->
-          [
-            (nolabel, elementTag);
-            (nolabel, Exp.array [mapper.expr mapper child]);
-          ]
-        | JSXChildrenItems children, [] ->
-          [
-            (nolabel, elementTag);
-            (nolabel, Exp.array (List.map (mapper.expr mapper) children));
-          ]
-        | _ ->
-          [
-            (nolabel, elementTag);
-            (labelled "props", props_expr);
-            (nolabel, children_expr);
-          ])
-      | UppercasedComponent -> (
-        match (key_arg_opt, children, props) with
-        | None, JSXChildrenItems [], [] ->
-          [(nolabel, elementTag); (nolabel, empty_record ~loc:Location.none)]
-        | None, JSXChildrenItems [], _ :: _ ->
-          [(nolabel, elementTag); (nolabel, props_expr)]
-        | Some key_arg, JSXChildrenItems [], _ ->
-          [key_arg; (nolabel, elementTag); (nolabel, props_expr)]
-        | None, (JSXChildrenItems [child] | JSXChildrenSpreading child), [] ->
-          [
-            (nolabel, elementTag);
-            ( nolabel,
-              Exp.record
-                [
-                  ( {txt = Lident "children"; loc = child.pexp_loc},
-                    mapper.expr mapper child,
-                    false );
-                ]
-                None );
-          ]
-        | None, JSXChildrenItems (_ :: _ :: _), _ ->
-          (* This one is a bit absurd, but doing it anyway to have parity with the old code *)
-          [
-            (nolabel, elementTag);
-            ( nolabel,
-              mk_record_from_props mapper false loc
-                (props
-                @ [
-                    JSXPropValue
-                      ( {txt = "children"; loc = Location.none},
-                        false,
-                        Exp.ident
-                          {
-                            txt = Ldot (Lident "React", "null");
-                            loc = Location.none;
-                          } );
-                  ]) );
-            (nolabel, children_expr);
-          ]
-        | None, (JSXChildrenItems [_] | JSXChildrenSpreading _), props ->
-          [
-            (nolabel, elementTag);
-            ( nolabel,
-              mk_record_from_props mapper false loc
-                (props
-                @ [
-                    JSXPropValue
-                      ( {txt = "children"; loc = Location.none},
-                        false,
-                        children_expr );
-                  ]) );
-          ]
-        | Some key_arg, (JSXChildrenItems [_] | JSXChildrenSpreading _), _ ->
-          [
-            key_arg;
-            (nolabel, elementTag);
-            ( nolabel,
-              mk_record_from_props mapper true loc
-                (props
-                @ [
-                    JSXPropValue
-                      ( {txt = "children"; loc = Location.none},
-                        false,
-                        children_expr );
-                  ]) );
-          ]
-        | Some key_arg, JSXChildrenItems (_ :: _), _ ->
-          [
-            key_arg;
-            (nolabel, elementTag);
-            ( nolabel,
-              mk_record_from_props mapper true loc
-                (props
-                @ [
-                    JSXPropValue
-                      ( {txt = "children"; loc = Location.none},
-                        false,
-                        Exp.ident
-                          {
-                            txt = Ldot (Lident "React", "null");
-                            loc = Location.none;
-                          } );
-                  ]) );
-            (nolabel, children_expr);
-          ])
-    in
-    (* f.ex ReactDOM.createElement *)
-    let creatElement : Longident.t =
-      match component_description with
-      | FragmentComponent ->
-        if more_than_one_children then
-          Ldot (Lident "React", "createElementVariadic")
-        else Ldot (Lident "React", "createElement")
+      | FragmentComponent | UppercasedComponent -> mapper.expr mapper child
       | LowercasedComponent ->
-        Ldot (Lident "ReactDOM", "createDOMElementVariadic")
-      | UppercasedComponent -> (
-        match (key_arg_opt, children) with
-        | ( None,
-            (JSXChildrenItems [] | JSXChildrenItems [_] | JSXChildrenSpreading _)
-          ) ->
-          Ldot (Lident "React", "createElement")
-        | None, JSXChildrenItems (_ :: _ :: _) ->
-          Ldot (Lident "React", "createElementVariadic")
-        | ( Some _,
-            (JSXChildrenItems [] | JSXChildrenItems [_] | JSXChildrenSpreading _)
-          ) ->
-          Ldot (Lident "JsxPPXReactSupport", "createElementWithKey")
-        | Some _, JSXChildrenItems (_ :: _) ->
-          Ldot (Lident "JsxPPXReactSupport", "createElementVariadicWithKey"))
+        let element_binding =
+          match config.module_ |> String.lowercase_ascii with
+          | "react" -> Lident "ReactDOM"
+          | _generic -> module_access_name config "Elements"
+        in
+        Exp.apply
+          (Exp.ident
+             {txt = Ldot (element_binding, "someElement"); loc = Location.none})
+          [(Nolabel, child)]
     in
-    Exp.apply ~loc ~attrs (Exp.ident ~loc {loc; txt = creatElement}) args
+    let is_optional =
+      match component_description with
+      | LowercasedComponent -> true
+      | FragmentComponent | UppercasedComponent -> false
+    in
+    props
+    @ [
+        JSXPropValue ({txt = "children"; loc = Location.none}, is_optional, expr);
+      ]
+  | JSXChildrenItems xs ->
+    (* this is a hack to support react components that introspect into their children *)
+    props
+    @ [
+        JSXPropValue
+          ( {txt = "children"; loc = Location.none},
+            false,
+            Exp.apply
+              (Exp.ident
+                 {txt = module_access_name config "array"; loc = Location.none})
+              [(Nolabel, Exp.array (List.map (mapper.expr mapper) xs))] );
+      ]
 
-  let expr (_config : Jsx_common.jsx_config) mapper expression =
-    match expression with
-    | {
-     pexp_desc = Pexp_jsx_fragment (_, children, _);
-     pexp_loc = loc;
-     pexp_attributes = attrs;
-    } ->
-      let loc = {loc with loc_ghost = true} in
-      let fragment =
-        Exp.ident ~loc {loc; txt = Ldot (Lident "React", "fragment")}
-      in
-      mk_react_create_element mapper loc attrs FragmentComponent fragment []
-        children
-    | {
-     pexp_desc =
-       Pexp_jsx_unary_element
-         {
-           jsx_unary_element_tag_name = tag_name;
-           jsx_unary_element_props = props;
-         };
-     pexp_loc = loc;
-     pexp_attributes = attrs;
-    } ->
-      let loc = {loc with loc_ghost = true} in
-      let name = Longident.flatten tag_name.txt |> String.concat "." in
-      if starts_with_lowercase name then
-        let component_name_expr =
-          let name = Longident.flatten tag_name.txt |> String.concat "." in
-          constant_string ~loc:tag_name.loc name
+let mk_react_jsx (config : Jsx_common.jsx_config) mapper loc attrs
+    (component_description : componentDescription) (elementTag : expression)
+    (props : jsx_props) (children : jsx_children) : expression =
+  let more_than_one_children =
+    match children with
+    | JSXChildrenSpreading _ -> false
+    | JSXChildrenItems xs -> List.length xs > 1
+  in
+  let props_with_children =
+    append_children_prop config mapper component_description props children
+  in
+  let props_record = mk_record_from_props mapper true loc props_with_children in
+  let jsx_expr, key_and_unit =
+    let mk_element_bind (jsx_part : string) : Longident.t =
+      match component_description with
+      | FragmentComponent | UppercasedComponent ->
+        module_access_name config jsx_part
+      | LowercasedComponent ->
+        let element_binding =
+          match config.module_ |> String.lowercase_ascii with
+          | "react" -> Lident "ReactDOM"
+          | _generic -> module_access_name config "Elements"
         in
-        mk_react_create_element mapper loc attrs LowercasedComponent
-          component_name_expr props (JSXChildrenItems [])
-      else if starts_with_uppercase name then
-        (* MyModule.make *)
-        let make_id =
-          Exp.ident ~loc:tag_name.loc
-            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
-        in
-        mk_react_create_element mapper loc attrs UppercasedComponent make_id
-          props (JSXChildrenItems [])
-      else
-        Jsx_common.raise_error ~loc
-          "JSX: element name is neither upper- or lowercase, got \"%s\""
-          (Longident.flatten tag_name.txt |> String.concat ".")
-    | {
-     pexp_desc =
-       Pexp_jsx_container_element
-         {
-           jsx_container_element_tag_name_start = tag_name;
-           jsx_container_element_props = props;
-           jsx_container_element_children = children;
-         };
-     pexp_loc = loc;
-     pexp_attributes = attrs;
-    } ->
-      let loc = {loc with loc_ghost = true} in
-      let name = Longident.flatten tag_name.txt |> String.concat "." in
-      if starts_with_lowercase name then
-        let component_name_expr =
-          let name = Longident.flatten tag_name.txt |> String.concat "." in
-          constant_string ~loc:tag_name.loc name
-        in
-        mk_react_create_element mapper loc attrs LowercasedComponent
-          component_name_expr props children
-      else if starts_with_uppercase name then
-        (* MyModule.make *)
-        let make_id =
-          Exp.ident ~loc:tag_name.loc
-            {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
-        in
-        mk_react_create_element mapper loc attrs UppercasedComponent make_id
-          props children
-      else
-        Jsx_common.raise_error ~loc
-          "JSX: element name is neither upper- or lowercase, got \"%s\""
-          (Longident.flatten tag_name.txt |> String.concat ".")
-    | e -> default_mapper.expr mapper e
-end
+        Ldot (element_binding, jsx_part)
+    in
+    match try_find_key_prop props with
+    | None ->
+      ( Exp.ident
+          {
+            loc = Location.none;
+            txt =
+              mk_element_bind (if more_than_one_children then "jsxs" else "jsx");
+          },
+        [] )
+    | Some key_prop ->
+      ( Exp.ident
+          {
+            loc = Location.none;
+            txt =
+              mk_element_bind
+                (if more_than_one_children then "jsxsKeyed" else "jsxKeyed");
+          },
+        [key_prop; (nolabel, unit_expr ~loc:Location.none)] )
+  in
+  let args = [(nolabel, elementTag); (nolabel, props_record)] @ key_and_unit in
+  Exp.apply ~loc ~attrs jsx_expr args
 
 let expr ~(config : Jsx_common.jsx_config) mapper expression =
-  match config.mode with
-  | "automatic" -> AutomaticExpr.expr ~config mapper expression
-  | "classic" -> ClassicExpr.expr config mapper expression
-  | _ -> default_mapper.expr mapper expression
+  match expression with
+  | {
+   pexp_desc = Pexp_jsx_fragment (_, children, _);
+   pexp_loc = loc;
+   pexp_attributes = attrs;
+  } ->
+    let loc = {loc with loc_ghost = true} in
+    let fragment =
+      Exp.ident ~loc {loc; txt = module_access_name config "jsxFragment"}
+    in
+    mk_react_jsx config mapper loc attrs FragmentComponent fragment [] children
+  | {
+   pexp_desc =
+     Pexp_jsx_unary_element
+       {jsx_unary_element_tag_name = tag_name; jsx_unary_element_props = props};
+   pexp_loc = loc;
+   pexp_attributes = attrs;
+  } ->
+    let loc = {loc with loc_ghost = true} in
+    let name = Longident.flatten tag_name.txt |> String.concat "." in
+    if starts_with_lowercase name then
+      (* For example 'input' *)
+      let component_name_expr = constant_string ~loc:tag_name.loc name in
+      mk_react_jsx config mapper loc attrs LowercasedComponent
+        component_name_expr props (JSXChildrenItems [])
+    else if starts_with_uppercase name then
+      (* MyModule.make *)
+      let make_id =
+        Exp.ident ~loc:tag_name.loc
+          {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
+      in
+      mk_react_jsx config mapper loc attrs UppercasedComponent make_id props
+        (JSXChildrenItems [])
+    else
+      Jsx_common.raise_error ~loc
+        "JSX: element name is neither upper- or lowercase, got \"%s\""
+        (Longident.flatten tag_name.txt |> String.concat ".")
+  | {
+   pexp_desc =
+     Pexp_jsx_container_element
+       {
+         jsx_container_element_tag_name_start = tag_name;
+         jsx_container_element_props = props;
+         jsx_container_element_children = children;
+       };
+   pexp_loc = loc;
+   pexp_attributes = attrs;
+  } ->
+    let loc = {loc with loc_ghost = true} in
+    let name = Longident.flatten tag_name.txt |> String.concat "." in
+    (* For example: <div> <h1></h1> <br /> </div>
+         This has an impact if we want to use ReactDOM.jsx or ReactDOM.jsxs
+           *)
+    if starts_with_lowercase name then
+      let component_name_expr = constant_string ~loc:tag_name.loc name in
+      mk_react_jsx config mapper loc attrs LowercasedComponent
+        component_name_expr props children
+    else if starts_with_uppercase name then
+      (* MyModule.make *)
+      let make_id =
+        Exp.ident ~loc:tag_name.loc
+          {txt = Ldot (tag_name.txt, "make"); loc = tag_name.loc}
+      in
+      mk_react_jsx config mapper loc attrs UppercasedComponent make_id props
+        children
+    else
+      Jsx_common.raise_error ~loc
+        "JSX: element name is neither upper- or lowercase, got \"%s\""
+        (Longident.flatten tag_name.txt |> String.concat ".")
+  | e -> default_mapper.expr mapper e
 
 let module_binding ~(config : Jsx_common.jsx_config) mapper module_binding =
   config.nested_modules <- module_binding.pmb_name.txt :: config.nested_modules;

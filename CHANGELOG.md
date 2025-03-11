@@ -14,11 +14,27 @@
 
 #### :rocket: New Feature
 
+- Add `Dict.has` and double `Dict.forEachWithKey`/`Dict.mapValues` performance. https://github.com/rescript-lang/rescript/pull/7316
 - Add popover attributes to JsxDOM.domProps. https://github.com/rescript-lang/rescript/pull/7317
+- Add `inert` attribute to `JsxDOM.domProps`. https://github.com/rescript-lang/rescript/pull/7326
+- Make reanalyze exception tracking work with the new stdlib. https://github.com/rescript-lang/rescript/pull/7328
+
+#### :boom: Breaking Change
+
+- Replace ~date with ~day in Date.make\*. https://github.com/rescript-lang/rescript/pull/7324
+- Remove `-bs-jsx-mode`. https://github.com/rescript-lang/rescript/pull/7327
 
 #### :house: Internal
 
 - Clean up legacy tags handling. https://github.com/rescript-lang/rescript/pull/7309
+
+#### :nail_care: Polish
+
+- Deprecate JSON.Classify.classify. https://github.com/rescript-lang/rescript/pull/7315
+
+#### :bug: Bug fix
+
+- Fix recursive untagged variant type checking by delaying well-formedness checks until environment construction completes. [#7320](https://github.com/rescript-lang/rescript/pull/7320)
 
 # 12.0.0-alpha.9
 
