@@ -1365,8 +1365,12 @@ let completionWithParser1 ~currentFile ~debug ~offset ~path ~posCursor
           let jsxCompletable =
             match expr.pexp_desc with
             | Pexp_jsx_container_element
-                {jsx_container_element_closing_tag = None} ->
-              (* This is a weird edge case where there is no closing tag *)
+                {
+                  jsx_container_element_closing_tag = None;
+                  jsx_container_element_children =
+                    JSXChildrenSpreading _ | JSXChildrenItems (_ :: _);
+                } ->
+              (* This is a weird edge case where there is no closing tag but there are children *)
               None
             | _ ->
               CompletionJsx.findJsxPropsCompletable ~jsxProps
