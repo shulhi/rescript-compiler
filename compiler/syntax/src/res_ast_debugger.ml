@@ -717,12 +717,36 @@ module SexpAst = struct
           [
             Sexp.atom "Pexp_jsx_fragment"; Sexp.list (map_empty ~f:expression xs);
           ]
-      | Pexp_jsx_unary_element _ ->
-        failwith "Pexp_jsx_unary_element is not supported"
-      | Pexp_jsx_container_element _ ->
-        failwith "Pexp_jsx_container_element is not supported"
+      | Pexp_jsx_unary_element {jsx_unary_element_props = props} ->
+        Sexp.list
+          [
+            Sexp.atom "Pexp_jsx_unary_element";
+            Sexp.list (map_empty ~f:jsx_prop props);
+          ]
+      | Pexp_jsx_container_element
+          {
+            jsx_container_element_props = props;
+            jsx_container_element_children = children;
+          } ->
+        let xs =
+          match children with
+          | JSXChildrenSpreading e -> [e]
+          | JSXChildrenItems xs -> xs
+        in
+        Sexp.list
+          [
+            Sexp.atom "Pexp_jsx_container_element";
+            Sexp.list (map_empty ~f:jsx_prop props);
+            Sexp.list (map_empty ~f:expression xs);
+          ]
     in
     Sexp.list [Sexp.atom "expression"; desc]
+
+  and jsx_prop = function
+    | JSXPropPunning (_, name) -> Sexp.atom name.txt
+    | JSXPropValue (name, _, expr) ->
+      Sexp.list [Sexp.atom name.txt; expression expr]
+    | JSXPropSpreading (_, expr) -> expression expr
 
   and case c =
     Sexp.list
