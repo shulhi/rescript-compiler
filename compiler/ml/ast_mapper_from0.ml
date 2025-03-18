@@ -315,6 +315,9 @@ module E = struct
     let open Exp in
     let loc = sub.location sub loc in
     let attrs = sub.attributes sub attrs in
+    let has_jsx_attribute () =
+      attrs |> List.exists (fun ({txt}, _) -> txt = "JSX")
+    in
     match desc with
     | Pexp_ident x -> ident ~loc ~attrs (map_loc sub x)
     | Pexp_constant x -> constant ~loc ~attrs (map_constant x)
@@ -327,6 +330,10 @@ module E = struct
         (map_opt (sub.expr sub) def)
         (sub.pat sub p) (sub.expr sub e)
     | Pexp_function _ -> assert false
+    | Pexp_apply ({pexp_desc = Pexp_ident tag_name}, _args)
+      when has_jsx_attribute () ->
+      let attrs = attrs |> List.filter (fun ({txt}, _) -> txt <> "JSX") in
+      jsx_unary_element ~loc ~attrs tag_name []
     | Pexp_apply (e, l) ->
       let e =
         match (e.pexp_desc, l) with
@@ -376,7 +383,7 @@ module E = struct
     | Pexp_tuple el -> tuple ~loc ~attrs (List.map (sub.expr sub) el)
     (* <></> *)
     | Pexp_construct ({txt = Longident.Lident "[]" | Longident.Lident "::"}, _)
-      when attrs |> List.exists (fun ({txt}, _) -> txt = "JSX") ->
+      when has_jsx_attribute () ->
       let attrs = attrs |> List.filter (fun ({txt}, _) -> txt <> "JSX") in
       (* TODO: support spread *)
       jsx_fragment ~loc ~attrs loc.loc_start

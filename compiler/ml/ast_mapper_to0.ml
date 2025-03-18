@@ -281,6 +281,9 @@ module M = struct
 end
 
 module E = struct
+  let jsx_attr sub =
+    sub.attribute sub (Location.mknoloc "JSX", Parsetree.PStr [])
+
   (* Value expressions for the core language *)
 
   let map sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
@@ -420,11 +423,27 @@ module E = struct
       in
       let list_expr = Ast_helper.Exp.make_list_expression loc xs None in
       let mapped = sub.expr sub list_expr in
-      let jsx_attr =
-        sub.attribute sub (Location.mknoloc "JSX", Parsetree.PStr [])
+
+      {mapped with pexp_attributes = jsx_attr sub :: attrs}
+    | Pexp_jsx_unary_element
+        {
+          jsx_unary_element_tag_name = tag_name;
+          jsx_unary_element_props = _props;
+        } ->
+      let tag_ident = map_loc sub tag_name in
+      let children_expr =
+        Ast_helper0.Exp.construct ~loc {txt = Lident "()"; loc} None
       in
-      {mapped with pexp_attributes = jsx_attr :: attrs}
-    | Pexp_jsx_unary_element _ -> failwith "TODO: Pexp_jsx_unary_element 1"
+      let unit_expr =
+        Ast_helper0.Exp.construct ~loc:!Ast_helper0.default_loc
+          {txt = Lident "()"; loc = !Ast_helper0.default_loc}
+          None
+      in
+      apply ~loc ~attrs:(jsx_attr sub :: attrs) (ident tag_ident)
+        [
+          (Asttypes.Noloc.Labelled "children", children_expr);
+          (Asttypes.Noloc.Nolabel, unit_expr);
+        ]
     | Pexp_jsx_container_element _ ->
       failwith "TODO: Pexp_jsx_container_element 1"
 end
