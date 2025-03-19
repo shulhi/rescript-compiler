@@ -335,13 +335,11 @@ module E = struct
            (Asttypes.Noloc.Labelled "_spreadProps", sub.expr sub value))
 
   let map_jsx_children sub loc children =
-    let xs =
-      match children with
-      | JSXChildrenSpreading e -> [e]
-      | JSXChildrenItems xs -> xs
-    in
-    let list_expr = Ast_helper.Exp.make_list_expression loc xs None in
-    sub.expr sub list_expr
+    match children with
+    | JSXChildrenSpreading e -> sub.expr sub e
+    | JSXChildrenItems xs ->
+      let list_expr = Ast_helper.Exp.make_list_expression loc xs None in
+      sub.expr sub list_expr
 
   (* Value expressions for the core language *)
 

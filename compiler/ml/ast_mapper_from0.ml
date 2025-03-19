@@ -295,7 +295,7 @@ end
 module E = struct
   (* Value expressions for the core language *)
 
-  let map_jsx_list sub (e : expression) : Pt.expression list =
+  let map_jsx_children sub (e : expression) : Pt.jsx_children =
     let rec visit (e : expression) : Pt.expression list =
       match e.pexp_desc with
       | Pexp_construct
@@ -308,7 +308,11 @@ module E = struct
         | Some e -> visit e)
       | _ -> [sub.expr sub e]
     in
-    visit e
+    match e.pexp_desc with
+    | Pexp_construct ({txt = Longident.Lident "[]" | Longident.Lident "::"}, _)
+      ->
+      JSXChildrenItems (visit e)
+    | _ -> JSXChildrenSpreading (sub.expr sub e)
 
   let try_map_jsx_prop (sub : mapper) (lbl : Asttypes.Noloc.arg_label)
       (e : expression) : Parsetree.jsx_prop option =
@@ -340,8 +344,7 @@ module E = struct
       match items with
       | [] | [_] -> (List.rev props, None)
       | [(Asttypes.Noloc.Labelled "children", children_expr); _] ->
-        ( List.rev props,
-          Some (Parsetree.JSXChildrenItems (map_jsx_list sub children_expr)) )
+        (List.rev props, Some (map_jsx_children sub children_expr))
       | (lbl, e) :: rest -> (
         match try_map_jsx_prop sub lbl e with
         | Some prop -> visit (prop :: props) rest
@@ -431,8 +434,7 @@ module E = struct
       when has_jsx_attribute () ->
       let attrs = attrs |> List.filter (fun ({txt}, _) -> txt <> "JSX") in
       (* TODO: support spread *)
-      jsx_fragment ~loc ~attrs loc.loc_start
-        (Parsetree.JSXChildrenItems (map_jsx_list sub e))
+      jsx_fragment ~loc ~attrs loc.loc_start (map_jsx_children sub e)
         loc.loc_end
     | Pexp_construct (lid, arg) -> (
       let lid1 = map_loc sub lid in
