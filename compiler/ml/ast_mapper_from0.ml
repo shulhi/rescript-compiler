@@ -310,6 +310,10 @@ module E = struct
     in
     visit e
 
+  let skip_last_two_elements elements =
+    let length = List.length elements in
+    List.filteri (fun i _ -> i < length - 2) elements
+
   let map sub e =
     let {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} = e in
     let open Exp in
@@ -330,10 +334,35 @@ module E = struct
         (map_opt (sub.expr sub) def)
         (sub.pat sub p) (sub.expr sub e)
     | Pexp_function _ -> assert false
-    | Pexp_apply ({pexp_desc = Pexp_ident tag_name}, _args)
+    | Pexp_apply ({pexp_desc = Pexp_ident tag_name}, args)
       when has_jsx_attribute () ->
       let attrs = attrs |> List.filter (fun ({txt}, _) -> txt <> "JSX") in
-      jsx_unary_element ~loc ~attrs tag_name []
+      let props =
+        args
+        (* The last args are children and unit *)
+        |> skip_last_two_elements
+        |> List.filter_map (fun (lbl, e) ->
+               match (lbl, e) with
+               | ( Asttypes.Noloc.Labelled name,
+                   {
+                     pexp_desc = Pexp_ident {txt = Longident.Lident v};
+                     pexp_loc = name_loc;
+                   } )
+                 when name = v ->
+                 Some
+                   (Parsetree.JSXPropPunning
+                      (false, {txt = name; loc = name_loc}))
+               | ( Asttypes.Noloc.Optional name,
+                   {
+                     pexp_desc = Pexp_ident {txt = Longident.Lident v};
+                     pexp_loc = name_loc;
+                   } )
+                 when name = v ->
+                 Some
+                   (Parsetree.JSXPropPunning (true, {txt = name; loc = name_loc}))
+               | _ -> None)
+      in
+      jsx_unary_element ~loc ~attrs tag_name props
     | Pexp_apply (e, l) ->
       let e =
         match (e.pexp_desc, l) with

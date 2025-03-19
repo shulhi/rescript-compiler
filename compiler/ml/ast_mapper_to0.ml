@@ -284,6 +284,29 @@ module E = struct
   let jsx_attr sub =
     sub.attribute sub (Location.mknoloc "JSX", Parsetree.PStr [])
 
+  let offset_position (pos : Lexing.position) (offset : int) : Lexing.position =
+    if offset <= 0 then pos
+    else
+      let open Lexing in
+      let rec aux pos offset =
+        if offset <= 0 then pos
+        else if offset <= pos.pos_cnum - pos.pos_bol then
+          (* We're on the same line *)
+          {pos with pos_cnum = pos.pos_cnum - offset}
+        else
+          (* Move to previous line and continue *)
+          let remaining = offset - (pos.pos_cnum - pos.pos_bol) in
+          aux
+            {
+              pos with
+              pos_lnum = pos.pos_lnum - 1;
+              pos_cnum = pos.pos_bol;
+              pos_bol = max 0 (pos.pos_bol - remaining);
+            }
+            remaining
+      in
+      aux pos offset
+
   (* Value expressions for the core language *)
 
   let map sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
@@ -426,13 +449,33 @@ module E = struct
 
       {mapped with pexp_attributes = jsx_attr sub :: attrs}
     | Pexp_jsx_unary_element
-        {
-          jsx_unary_element_tag_name = tag_name;
-          jsx_unary_element_props = _props;
-        } ->
+        {jsx_unary_element_tag_name = tag_name; jsx_unary_element_props = props}
+      ->
       let tag_ident = map_loc sub tag_name in
+      let props =
+        props
+        |> List.map (function
+             | JSXPropPunning (is_optional, name) ->
+               let ident =
+                 ident ~loc:name.loc
+                   {txt = Longident.Lident name.txt; loc = name.loc}
+               in
+               let label =
+                 if is_optional then Asttypes.Noloc.Optional name.txt
+                 else Asttypes.Noloc.Labelled name.txt
+               in
+               (label, ident)
+             | _ -> failwith "todo")
+      in
       let children_expr =
-        Ast_helper0.Exp.construct ~loc {txt = Lident "()"; loc} None
+        let loc =
+          {
+            loc_ghost = true;
+            loc_start = offset_position loc.loc_end 2;
+            loc_end = offset_position loc.loc_end 1;
+          }
+        in
+        Ast_helper0.Exp.construct ~loc {txt = Lident "[]"; loc} None
       in
       let unit_expr =
         Ast_helper0.Exp.construct ~loc:!Ast_helper0.default_loc
@@ -440,10 +483,11 @@ module E = struct
           None
       in
       apply ~loc ~attrs:(jsx_attr sub :: attrs) (ident tag_ident)
-        [
-          (Asttypes.Noloc.Labelled "children", children_expr);
-          (Asttypes.Noloc.Nolabel, unit_expr);
-        ]
+        (props
+        @ [
+            (Asttypes.Noloc.Labelled "children", children_expr);
+            (Asttypes.Noloc.Nolabel, unit_expr);
+          ])
     | Pexp_jsx_container_element _ ->
       failwith "TODO: Pexp_jsx_container_element 1"
 end
