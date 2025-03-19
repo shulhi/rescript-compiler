@@ -4456,8 +4456,8 @@ and print_jsx_container_tag ~state tag_name props
   in
   let line_sep = Doc.line in
   let print_children children =
-    print_jsx_children ~sep:line_sep ~state children cmt_tbl
-    |> Doc.group |> Doc.indent
+    Doc.group
+      (Doc.indent (print_jsx_children ~sep:line_sep ~state children cmt_tbl))
   in
 
   Doc.group
@@ -4487,6 +4487,7 @@ and print_jsx_container_tag ~state tag_name props
            [
              (if has_children then Doc.line else Doc.nil);
              (if has_children then print_children children else Doc.nil);
+             (if has_children then Doc.line else Doc.nil);
              Doc.text "</";
              name;
              Doc.greater_than;
@@ -4631,6 +4632,7 @@ and print_jsx_children ~state (children_expr : Parsetree.jsx_children) ~sep
   | JSXChildrenSpreading child ->
     Doc.concat
       [Doc.dotdotdot; print_expression_with_comments ~state child cmt_tbl]
+  | JSXChildrenItems [] -> Doc.nil
   | JSXChildrenItems children ->
     children
     |> List.map (fun child ->
