@@ -433,7 +433,6 @@ module E = struct
     | Pexp_construct ({txt = Longident.Lident "[]" | Longident.Lident "::"}, _)
       when has_jsx_attribute () ->
       let attrs = attrs |> List.filter (fun ({txt}, _) -> txt <> "JSX") in
-      (* TODO: support spread *)
       jsx_fragment ~loc ~attrs loc.loc_start (map_jsx_children sub e)
         loc.loc_end
     | Pexp_construct (lid, arg) -> (

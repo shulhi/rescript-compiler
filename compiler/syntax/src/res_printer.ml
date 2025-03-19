@@ -4469,7 +4469,8 @@ and print_jsx_container_tag ~state tag_name props
                 print_comments
                   (Doc.concat [Doc.less_than; name])
                   cmt_tbl tag_name.Asttypes.loc;
-                Doc.space;
+                (if not (List.is_empty formatted_props) then Doc.space
+                 else Doc.nil);
                 (* todo: might not be needed if no props?*)
                 Doc.join formatted_props ~sep:Doc.space;
                 (* if tag A has trailing comments then put > on the next line
