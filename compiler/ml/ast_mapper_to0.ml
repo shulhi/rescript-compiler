@@ -471,7 +471,8 @@ module E = struct
                  else Asttypes.Noloc.Labelled name.txt
                in
                (label, sub.expr sub value)
-             | _ -> failwith "todo")
+             | JSXPropSpreading (_, value) ->
+               (Asttypes.Noloc.Labelled "_spreadProps", sub.expr sub value))
       in
       let children_expr =
         let loc =

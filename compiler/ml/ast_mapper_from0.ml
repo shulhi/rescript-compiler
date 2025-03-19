@@ -343,6 +343,9 @@ module E = struct
         |> skip_last_two_elements
         |> List.filter_map (fun (lbl, e) ->
                match (lbl, e) with
+               | Asttypes.Noloc.Labelled "_spreadProps", expr ->
+                 Some
+                   (Parsetree.JSXPropSpreading (Location.none, sub.expr sub expr))
                | ( Asttypes.Noloc.Labelled name,
                    {
                      pexp_desc = Pexp_ident {txt = Longident.Lident v};
