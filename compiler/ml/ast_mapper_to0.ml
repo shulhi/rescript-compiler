@@ -307,6 +307,42 @@ module E = struct
       in
       aux pos offset
 
+  let jsx_unit_expr =
+    Ast_helper0.Exp.construct ~loc:!Ast_helper0.default_loc
+      {txt = Lident "()"; loc = !Ast_helper0.default_loc}
+      None
+
+  let map_jsx_props sub props =
+    props
+    |> List.map (function
+         | JSXPropPunning (is_optional, name) ->
+           let ident =
+             Exp.ident ~loc:name.loc
+               {txt = Longident.Lident name.txt; loc = name.loc}
+           in
+           let label =
+             if is_optional then Asttypes.Noloc.Optional name.txt
+             else Asttypes.Noloc.Labelled name.txt
+           in
+           (label, ident)
+         | JSXPropValue (name, is_optional, value) ->
+           let label =
+             if is_optional then Asttypes.Noloc.Optional name.txt
+             else Asttypes.Noloc.Labelled name.txt
+           in
+           (label, sub.expr sub value)
+         | JSXPropSpreading (_, value) ->
+           (Asttypes.Noloc.Labelled "_spreadProps", sub.expr sub value))
+
+  let map_jsx_children sub loc children =
+    let xs =
+      match children with
+      | JSXChildrenSpreading e -> [e]
+      | JSXChildrenItems xs -> xs
+    in
+    let list_expr = Ast_helper.Exp.make_list_expression loc xs None in
+    sub.expr sub list_expr
+
   (* Value expressions for the core language *)
 
   let map sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
@@ -439,41 +475,13 @@ module E = struct
          This is not the case in the old AST. There it is from >...</
       *)
       let loc = {loc with loc_start = o; loc_end = c} in
-      let xs =
-        match children with
-        | JSXChildrenSpreading e -> [e]
-        | JSXChildrenItems xs -> xs
-      in
-      let list_expr = Ast_helper.Exp.make_list_expression loc xs None in
-      let mapped = sub.expr sub list_expr in
-
+      let mapped = map_jsx_children sub loc children in
       {mapped with pexp_attributes = jsx_attr sub :: attrs}
     | Pexp_jsx_unary_element
         {jsx_unary_element_tag_name = tag_name; jsx_unary_element_props = props}
       ->
       let tag_ident = map_loc sub tag_name in
-      let props =
-        props
-        |> List.map (function
-             | JSXPropPunning (is_optional, name) ->
-               let ident =
-                 ident ~loc:name.loc
-                   {txt = Longident.Lident name.txt; loc = name.loc}
-               in
-               let label =
-                 if is_optional then Asttypes.Noloc.Optional name.txt
-                 else Asttypes.Noloc.Labelled name.txt
-               in
-               (label, ident)
-             | JSXPropValue (name, is_optional, value) ->
-               let label =
-                 if is_optional then Asttypes.Noloc.Optional name.txt
-                 else Asttypes.Noloc.Labelled name.txt
-               in
-               (label, sub.expr sub value)
-             | JSXPropSpreading (_, value) ->
-               (Asttypes.Noloc.Labelled "_spreadProps", sub.expr sub value))
-      in
+      let props = map_jsx_props sub props in
       let children_expr =
         let loc =
           {
@@ -495,8 +503,21 @@ module E = struct
             (Asttypes.Noloc.Labelled "children", children_expr);
             (Asttypes.Noloc.Nolabel, unit_expr);
           ])
-    | Pexp_jsx_container_element _ ->
-      failwith "TODO: Pexp_jsx_container_element 1"
+    | Pexp_jsx_container_element
+        {
+          jsx_container_element_tag_name_start = tag_name;
+          jsx_container_element_props = props;
+          jsx_container_element_children = children;
+        } ->
+      let tag_ident = map_loc sub tag_name in
+      let props = map_jsx_props sub props in
+      let children_expr = map_jsx_children sub loc children in
+      apply ~loc ~attrs:(jsx_attr sub :: attrs) (ident tag_ident)
+        (props
+        @ [
+            (Asttypes.Noloc.Labelled "children", children_expr);
+            (Asttypes.Noloc.Nolabel, jsx_unit_expr);
+          ])
 end
 
 module P = struct
