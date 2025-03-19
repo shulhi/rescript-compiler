@@ -465,6 +465,12 @@ module E = struct
                  else Asttypes.Noloc.Labelled name.txt
                in
                (label, ident)
+             | JSXPropValue (name, is_optional, value) ->
+               let label =
+                 if is_optional then Asttypes.Noloc.Optional name.txt
+                 else Asttypes.Noloc.Labelled name.txt
+               in
+               (label, sub.expr sub value)
              | _ -> failwith "todo")
       in
       let children_expr =

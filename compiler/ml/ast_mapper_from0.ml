@@ -360,6 +360,16 @@ module E = struct
                  when name = v ->
                  Some
                    (Parsetree.JSXPropPunning (true, {txt = name; loc = name_loc}))
+               | Asttypes.Noloc.Labelled name, exp ->
+                 Some
+                   (Parsetree.JSXPropValue
+                      ( {txt = name; loc = Location.none},
+                        false,
+                        sub.expr sub exp ))
+               | Asttypes.Noloc.Optional name, exp ->
+                 Some
+                   (Parsetree.JSXPropValue
+                      ({txt = name; loc = Location.none}, true, sub.expr sub exp))
                | _ -> None)
       in
       jsx_unary_element ~loc ~attrs tag_name props
