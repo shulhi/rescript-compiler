@@ -4628,16 +4628,30 @@ and print_jsx_children_old ~state (children_expr : Parsetree.expression) ~sep
 and print_jsx_children ~state (children_expr : Parsetree.jsx_children) ~sep
     cmt_tbl =
   let open Parsetree in
+  let print_expr (expr : Parsetree.expression) =
+    let leading_line_comment_present =
+      has_leading_line_comment cmt_tbl expr.pexp_loc
+    in
+    let expr_doc = print_expression_with_comments ~state expr cmt_tbl in
+    let add_parens_or_braces expr_doc =
+      (* {(20: int)} make sure that we also protect the expression inside *)
+      let inner_doc =
+        if Parens.braced_expr expr then add_parens expr_doc else expr_doc
+      in
+      if leading_line_comment_present then add_braces inner_doc
+      else Doc.concat [Doc.lbrace; inner_doc; Doc.rbrace]
+    in
+    match Parens.jsx_child_expr expr with
+    | Nothing -> expr_doc
+    | Parenthesized -> add_parens_or_braces expr_doc
+    | Braced braces_loc ->
+      print_comments (add_parens_or_braces expr_doc) cmt_tbl braces_loc
+  in
   match children_expr with
-  | JSXChildrenSpreading child ->
-    Doc.concat
-      [Doc.dotdotdot; print_expression_with_comments ~state child cmt_tbl]
+  | JSXChildrenSpreading child -> Doc.concat [Doc.dotdotdot; print_expr child]
   | JSXChildrenItems [] -> Doc.nil
   | JSXChildrenItems children ->
-    children
-    |> List.map (fun child ->
-           print_expression_with_comments ~state child cmt_tbl)
-    |> Doc.join ~sep
+    children |> List.map print_expr |> Doc.join ~sep
 
 and print_jsx_props_old ~state args cmt_tbl :
     Doc.t * Parsetree.expression option =
@@ -4780,15 +4794,31 @@ and print_jsx_prop ~state prop cmt_tbl =
     if is_optional then Doc.concat [Doc.question; Doc.text name.txt]
     else Doc.text name.txt
   | JSXPropValue (name, is_optional, value) ->
-    let value =
-      if is_optional then
-        [Doc.question; print_expression_with_comments ~state value cmt_tbl]
-      else [print_expression_with_comments ~state value cmt_tbl]
+    let value_doc =
+      let v =
+        Doc.concat
+          [
+            (if is_optional then Doc.question else Doc.nil);
+            print_expression_with_comments ~state value cmt_tbl;
+          ]
+      in
+      match Parens.jsx_prop_expr value with
+      | Parenthesized | Braced _ ->
+        let inner_doc = if Parens.braced_expr value then add_parens v else v in
+        if has_leading_line_comment cmt_tbl value.pexp_loc then
+          add_braces inner_doc
+        else Doc.concat [Doc.lbrace; inner_doc; Doc.rbrace]
+      | _ -> v
     in
-    Doc.concat [Doc.text name.txt; Doc.equal; Doc.group (Doc.concat value)]
+    Doc.concat [Doc.text name.txt; Doc.equal; Doc.group value_doc]
   | JSXPropSpreading (_, value) ->
     Doc.concat
-      [Doc.dotdotdot; print_expression_with_comments ~state value cmt_tbl]
+      [
+        Doc.lbrace;
+        Doc.dotdotdot;
+        print_expression_with_comments ~state value cmt_tbl;
+        Doc.rbrace;
+      ]
 
 and print_jsx_props ~state props cmt_tbl : Doc.t list =
   props |> List.map (fun prop -> print_jsx_prop ~state prop cmt_tbl)
