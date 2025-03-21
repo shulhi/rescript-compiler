@@ -4342,7 +4342,16 @@ and print_jsx_container_tag ~state tag_name props
   let line_sep = Doc.line in
   let print_children children =
     Doc.group
-      (Doc.indent (print_jsx_children ~sep:line_sep ~state children cmt_tbl))
+      (Doc.concat
+         [
+           Doc.indent
+             (Doc.concat
+                [
+                  Doc.line;
+                  print_jsx_children ~sep:line_sep ~state children cmt_tbl;
+                ]);
+           Doc.line;
+         ])
   in
 
   Doc.group
@@ -4370,9 +4379,7 @@ and print_jsx_container_tag ~state tag_name props
               ]);
          Doc.concat
            [
-             (if has_children then Doc.line else Doc.nil);
              (if has_children then print_children children else Doc.nil);
-             (if has_children then Doc.line else Doc.nil);
              Doc.text "</";
              name;
              Doc.greater_than;
