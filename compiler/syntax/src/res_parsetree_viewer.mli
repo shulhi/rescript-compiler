@@ -87,8 +87,6 @@ val filter_ternary_attributes : Parsetree.attributes -> Parsetree.attributes
 val filter_fragile_match_attributes :
   Parsetree.attributes -> Parsetree.attributes
 
-val is_jsx_expression : Parsetree.expression -> bool
-
 val should_indent_binary_expr : Parsetree.expression -> bool
 val should_inline_rhs_binary_expr : Parsetree.expression -> bool
 val has_printable_attributes : Parsetree.attributes -> bool

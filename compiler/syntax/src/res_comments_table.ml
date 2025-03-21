@@ -1397,67 +1397,21 @@ and walk_expression expr t comments =
         walk_expression call_expr t inside;
         after)
     in
-    if ParsetreeViewer.is_jsx_expression expr then (
-      let props =
-        arguments
-        |> List.filter (fun (label, _) ->
-               match label with
-               | Asttypes.Labelled {txt = "children"} -> false
-               | Asttypes.Nolabel -> false
-               | _ -> true)
-      in
-      let maybe_children =
-        arguments
-        |> List.find_opt (fun (label, _) ->
-               match label with
-               | Asttypes.Labelled {txt = "children"} -> true
-               | _ -> false)
-      in
-      match maybe_children with
-      (* There is no need to deal with this situation as the children cannot be NONE *)
-      | None -> ()
-      | Some (_, children) ->
-        let leading, inside, _ = partition_by_loc after children.pexp_loc in
-        if props = [] then
-          (* All comments inside a tag are trailing comments of the tag if there are no props
-             <A
-             // comment
-             // comment
-             />
-          *)
-          let after_expr, _ =
-            partition_adjacent_trailing call_expr.pexp_loc after
-          in
-          attach t.trailing call_expr.pexp_loc after_expr
-        else
-          walk_list
-            (props
-            |> List.map (fun (lbl, expr) ->
-                   let loc =
-                     match lbl with
-                     | Asttypes.Labelled {loc} | Optional {loc} ->
-                       {loc with loc_end = expr.Parsetree.pexp_loc.loc_end}
-                     | _ -> expr.pexp_loc
-                   in
-                   ExprArgument {expr; loc}))
-            t leading;
-        walk_expression children t inside)
-    else
-      let after_expr, rest =
-        partition_adjacent_trailing call_expr.pexp_loc after
-      in
-      attach t.trailing call_expr.pexp_loc after_expr;
-      walk_list
-        (arguments
-        |> List.map (fun (lbl, expr) ->
-               let loc =
-                 match lbl with
-                 | Asttypes.Labelled {loc} | Optional {loc} ->
-                   {loc with loc_end = expr.Parsetree.pexp_loc.loc_end}
-                 | _ -> expr.pexp_loc
-               in
-               ExprArgument {expr; loc}))
-        t rest
+    let after_expr, rest =
+      partition_adjacent_trailing call_expr.pexp_loc after
+    in
+    attach t.trailing call_expr.pexp_loc after_expr;
+    walk_list
+      (arguments
+      |> List.map (fun (lbl, expr) ->
+             let loc =
+               match lbl with
+               | Asttypes.Labelled {loc} | Optional {loc} ->
+                 {loc with loc_end = expr.Parsetree.pexp_loc.loc_end}
+               | _ -> expr.pexp_loc
+             in
+             ExprArgument {expr; loc}))
+      t rest
   | Pexp_fun _ | Pexp_newtype _ -> (
     let _, parameters, return_expr = fun_expr expr in
     let comments =
@@ -1518,8 +1472,24 @@ and walk_expression expr t comments =
     in
     let xs = exprs |> List.map (fun e -> Expression e) in
     walk_list xs t rest
-  | Pexp_jsx_unary_element _ -> failwith "Pexp_jsx_unary_element 3"
-  | Pexp_jsx_container_element _ -> failwith "Pexp_jsx_container_element 3"
+  | Pexp_jsx_unary_element _ ->
+    (* TODO: save me shulhi, not sure what needs to be done here *)
+    ()
+  | Pexp_jsx_container_element
+      {
+        jsx_container_element_opening_tag_end = opening_greater_than;
+        jsx_container_element_children = children;
+      } ->
+    let opening_token = {expr.pexp_loc with loc_end = opening_greater_than} in
+    let on_same_line, rest = partition_by_on_same_line opening_token comments in
+    attach t.trailing opening_token on_same_line;
+    let exprs =
+      match children with
+      | Parsetree.JSXChildrenSpreading e -> [e]
+      | Parsetree.JSXChildrenItems xs -> xs
+    in
+    let xs = exprs |> List.map (fun e -> Expression e) in
+    walk_list xs t rest
   | Pexp_send _ -> ()
 
 and walk_expr_parameter (_attrs, _argLbl, expr_opt, pattern) t comments =

@@ -484,13 +484,6 @@ let filter_fragile_match_attributes attrs =
       | _ -> true)
     attrs
 
-let is_jsx_expression expr =
-  match expr.pexp_desc with
-  | Pexp_jsx_fragment _ | Pexp_jsx_unary_element _
-  | Pexp_jsx_container_element _ ->
-    true
-  | _ -> false
-
 let should_indent_binary_expr expr =
   let same_precedence_sub_expression operator sub_expression =
     match sub_expression with
