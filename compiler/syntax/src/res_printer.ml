@@ -4311,7 +4311,8 @@ and print_pexp_apply ~state expr cmt_tbl =
 
 and print_jsx_unary_tag ~state tag_name props cmt_tbl =
   let name = print_jsx_name tag_name in
-  let formatted_props = print_jsx_props ~state ~isUnary:true props cmt_tbl in
+  let formatted_props = print_jsx_props ~state props cmt_tbl in
+  let formatted_props = formatted_props @ [Doc.text "/>"] in
   Doc.group
    (Doc.concat
       [
@@ -4319,7 +4320,6 @@ and print_jsx_unary_tag ~state tag_name props cmt_tbl =
           (Doc.concat [Doc.less_than; name])
           cmt_tbl tag_name.Asttypes.loc;
         Doc.space;
-        (* todo: might not be needed if no props?*)
         Doc.indent (Doc.group (Doc.join formatted_props ~sep:Doc.line));
       ]);
 
@@ -4510,9 +4510,8 @@ and print_jsx_prop ~state prop cmt_tbl =
         Doc.rbrace;
       ]
 
-and print_jsx_props ~state ?(isUnary=false) props cmt_tbl : Doc.t list =
-  let props = props |> List.map (fun prop -> print_jsx_prop ~state prop cmt_tbl) in
-  if isUnary then props @ [Doc.text "/>"] else props
+and print_jsx_props ~state props cmt_tbl : Doc.t list =
+  props |> List.map (fun prop -> print_jsx_prop ~state prop cmt_tbl)
 
 
 (* div -> div.
