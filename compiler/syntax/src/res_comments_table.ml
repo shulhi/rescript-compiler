@@ -24,7 +24,7 @@ let copy tbl =
 
 let empty = make ()
 
-let print_loc (k : Warnings.loc) =
+let print_location (k : Warnings.loc) =
   Doc.concat
     [
       Doc.lbracket;
@@ -41,7 +41,7 @@ let print_loc (k : Warnings.loc) =
 let print_entries tbl =
   Hashtbl.fold
     (fun (k : Location.t) (v : Comment.t list) acc ->
-      let loc = print_loc k in
+      let loc = print_location k in
       let doc =
         Doc.breakable_group ~force_break:true
           (Doc.concat
@@ -1472,9 +1472,28 @@ and walk_expression expr t comments =
     in
     let xs = exprs |> List.map (fun e -> Expression e) in
     walk_list xs t rest
-  | Pexp_jsx_unary_element _ ->
-    (* TODO: save me shulhi, not sure what needs to be done here *)
-    ()
+  | Pexp_jsx_unary_element
+      {jsx_unary_element_tag_name = tag; jsx_unary_element_props = props} ->
+    (* handles the comments at the tag *)
+    let _, _, trailing = partition_by_loc comments tag.loc in
+    let after_expr, _ = partition_adjacent_trailing tag.loc trailing in
+    attach t.trailing tag.loc after_expr;
+    (* handles the comments for the actual props *)
+    List.iter
+      (fun prop ->
+        match prop with
+        | Parsetree.JSXPropPunning (_, _) -> ()
+        | Parsetree.JSXPropValue (_, _, expr) ->
+          let _leading, inside, trailing =
+            partition_by_loc comments expr.pexp_loc
+          in
+          let after_expr, _ =
+            partition_adjacent_trailing expr.pexp_loc trailing
+          in
+          attach t.trailing expr.pexp_loc after_expr;
+          walk_expression expr t inside
+        | Parsetree.JSXPropSpreading (_loc, _expr) -> ())
+      props
   | Pexp_jsx_container_element
       {
         jsx_container_element_opening_tag_end = opening_greater_than;

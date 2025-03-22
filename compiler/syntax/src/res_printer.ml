@@ -4312,21 +4312,44 @@ and print_pexp_apply ~state expr cmt_tbl =
 and print_jsx_unary_tag ~state tag_name props cmt_tbl =
   let name = print_jsx_name tag_name in
   let formatted_props = print_jsx_props ~state props cmt_tbl in
+  let tag_has_trailing_comment = has_trailing_comments cmt_tbl tag_name.loc in
+  let tag_has_no_props = List.is_empty props in
+  let props_doc =
+    if tag_has_no_props then Doc.nil
+    else
+      Doc.indent
+        (Doc.concat
+           [Doc.line; Doc.group (Doc.join formatted_props ~sep:Doc.line)])
+  in
+  let opening_tag =
+    print_comments
+      (Doc.concat [Doc.less_than; name])
+      cmt_tbl tag_name.Asttypes.loc
+  in
+  let opening_tag_doc =
+    if tag_has_trailing_comment && not tag_has_no_props then
+      Doc.indent opening_tag
+    else opening_tag
+  in
+  let closing_tag_doc =
+    let sep =
+      match
+        (Doc.will_break props_doc, tag_has_trailing_comment, tag_has_no_props)
+      with
+      | true, _, _ -> Doc.soft_line
+      | false, true, true -> Doc.nil
+      | false, _, _ -> Doc.line
+    in
+    Doc.concat [sep; Doc.text "/>"]
+  in
   Doc.group
     (Doc.concat
        [
-         Doc.group
-           (Doc.concat
-              [
-                print_comments
-                  (Doc.concat [Doc.less_than; name])
-                  cmt_tbl tag_name.Asttypes.loc;
-                Doc.space;
-                (* todo: might not be needed if no props?*)
-                Doc.join formatted_props ~sep:Doc.space;
-                Doc.text "/>";
-              ]);
-         Doc.nil;
+         opening_tag_doc;
+         props_doc;
+         (if tag_has_trailing_comment && tag_has_no_props then Doc.hard_line
+          else Doc.nil);
+         closing_tag_doc;
        ])
 
 and print_jsx_container_tag ~state tag_name props
