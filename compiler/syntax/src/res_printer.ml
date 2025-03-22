@@ -4312,17 +4312,26 @@ and print_pexp_apply ~state expr cmt_tbl =
 and print_jsx_unary_tag ~state tag_name props cmt_tbl =
   let name = print_jsx_name tag_name in
   let formatted_props = print_jsx_props ~state props cmt_tbl in
+  let props_doc =
+    match props with
+    | [] -> Doc.nil
+    | _ ->
+      Doc.indent
+        (Doc.concat
+           [Doc.line; Doc.group (Doc.join formatted_props ~sep:Doc.line)])
+  in
+  let closing_tag =
+    if Doc.will_break props_doc then Doc.concat [Doc.soft_line; Doc.text "/>"]
+    else Doc.concat [Doc.space; Doc.text "/>"]
+  in
   Doc.group
     (Doc.concat
        [
          print_comments
            (Doc.concat [Doc.less_than; name])
            cmt_tbl tag_name.Asttypes.loc;
-         Doc.indent
-           (Doc.concat
-              [Doc.line; Doc.group (Doc.join formatted_props ~sep:Doc.line)]);
-         Doc.soft_line;
-         Doc.text "/>";
+         props_doc;
+         closing_tag;
        ])
 
 and print_jsx_container_tag ~state tag_name props
