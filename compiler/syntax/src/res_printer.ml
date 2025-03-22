@@ -4510,8 +4510,15 @@ and print_jsx_prop ~state prop cmt_tbl =
   let open Parsetree in
   match prop with
   | JSXPropPunning (is_optional, name) ->
-    if is_optional then Doc.concat [Doc.question; Doc.text name.txt]
-    else Doc.text name.txt
+    let prop_has_trailing_comment = has_trailing_comments cmt_tbl name.loc in
+    let () = CommentTable.print_location name.loc |> Doc.to_string ~width:80 |> print_endline in
+    let () = CommentTable.log cmt_tbl in
+    let doc =
+      if is_optional then Doc.concat [Doc.question; Doc.text name.txt]
+      else Doc.text name.txt
+    in
+    let doc = print_comments doc cmt_tbl name.loc in 
+    if prop_has_trailing_comment then Doc.group (Doc.concat [Doc.break_parent; doc]) else doc
   | JSXPropValue (name, is_optional, value) ->
     let value_doc =
       let v =

@@ -1482,7 +1482,10 @@ and walk_expression expr t comments =
     List.iter
       (fun prop ->
         match prop with
-        | Parsetree.JSXPropPunning (_, _) -> ()
+        | Parsetree.JSXPropPunning (_, {loc}) ->
+          let _leading, _inside, trailing = partition_by_loc comments loc in
+          let after_expr, _ = partition_adjacent_trailing loc trailing in
+          attach t.trailing loc after_expr
         | Parsetree.JSXPropValue (_, _, expr) ->
           let _leading, inside, trailing =
             partition_by_loc comments expr.pexp_loc
