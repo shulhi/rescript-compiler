@@ -4312,6 +4312,7 @@ and print_pexp_apply ~state expr cmt_tbl =
 and print_jsx_unary_tag ~state tag_name props cmt_tbl =
   let name = print_jsx_name tag_name in
   let formatted_props = print_jsx_props ~state props cmt_tbl in
+  let has_no_props = List.is_empty props in
   let props_doc =
     match props with
     | [] -> Doc.nil
@@ -4320,17 +4321,32 @@ and print_jsx_unary_tag ~state tag_name props cmt_tbl =
         (Doc.concat
            [Doc.line; Doc.group (Doc.join formatted_props ~sep:Doc.line)])
   in
+  let tag_has_trailing_comment = has_trailing_comments cmt_tbl tag_name.loc in
+  let opening_tag =
+    print_comments
+      (Doc.concat [Doc.less_than; name])
+      cmt_tbl tag_name.Asttypes.loc
+  in
+  let opening_tag =
+    if tag_has_trailing_comment && not has_no_props then Doc.indent opening_tag
+    else opening_tag
+  in
   let closing_tag =
     if Doc.will_break props_doc then Doc.concat [Doc.soft_line; Doc.text "/>"]
-    else Doc.concat [Doc.space; Doc.text "/>"]
+    else
+      Doc.concat
+        [
+          (if tag_has_trailing_comment && has_no_props then Doc.nil else Doc.line);
+          Doc.text "/>";
+        ]
   in
   Doc.group
     (Doc.concat
        [
-         print_comments
-           (Doc.concat [Doc.less_than; name])
-           cmt_tbl tag_name.Asttypes.loc;
+         opening_tag;
          props_doc;
+         (if tag_has_trailing_comment && has_no_props then Doc.hard_line
+          else Doc.nil);
          closing_tag;
        ])
 
