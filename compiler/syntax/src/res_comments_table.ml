@@ -1473,24 +1473,21 @@ and walk_expression expr t comments =
     let xs = exprs |> List.map (fun e -> Expression e) in
     walk_list xs t rest
   | Pexp_jsx_unary_element {jsx_unary_element_props = props} ->
-    let _ =
-      List.map
-        (fun prop ->
-          match prop with
-          | Parsetree.JSXPropPunning (_, _) -> ()
-          | Parsetree.JSXPropValue (_, _, expr) ->
-            let _leading, inside, trailing =
-              partition_by_loc comments expr.pexp_loc
-            in
-            let after_expr, _ =
-              partition_adjacent_trailing expr.pexp_loc trailing
-            in
-            attach t.trailing expr.pexp_loc after_expr;
-            walk_expression expr t inside
-          | Parsetree.JSXPropSpreading (_loc, _expr) -> ())
-        props
-    in
-    ()
+    List.iter
+      (fun prop ->
+        match prop with
+        | Parsetree.JSXPropPunning (_, _) -> ()
+        | Parsetree.JSXPropValue (_, _, expr) ->
+          let _leading, inside, trailing =
+            partition_by_loc comments expr.pexp_loc
+          in
+          let after_expr, _ =
+            partition_adjacent_trailing expr.pexp_loc trailing
+          in
+          attach t.trailing expr.pexp_loc after_expr;
+          walk_expression expr t inside
+        | Parsetree.JSXPropSpreading (_loc, _expr) -> ())
+      props
   | Pexp_jsx_container_element
       {
         jsx_container_element_opening_tag_end = opening_greater_than;

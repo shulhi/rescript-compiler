@@ -4312,7 +4312,6 @@ and print_pexp_apply ~state expr cmt_tbl =
 and print_jsx_unary_tag ~state tag_name props cmt_tbl =
   let name = print_jsx_name tag_name in
   let formatted_props = print_jsx_props ~state props cmt_tbl in
-  let formatted_props = formatted_props @ [Doc.text "/>"] in
   Doc.group
     (Doc.concat
        [
@@ -4322,6 +4321,8 @@ and print_jsx_unary_tag ~state tag_name props cmt_tbl =
          Doc.indent
            (Doc.concat
               [Doc.line; Doc.group (Doc.join formatted_props ~sep:Doc.line)]);
+         Doc.soft_line;
+         Doc.text "/>";
        ])
 
 and print_jsx_container_tag ~state tag_name props
