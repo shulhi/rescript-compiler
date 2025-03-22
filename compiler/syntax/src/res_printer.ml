@@ -4314,14 +4314,15 @@ and print_jsx_unary_tag ~state tag_name props cmt_tbl =
   let formatted_props = print_jsx_props ~state props cmt_tbl in
   let formatted_props = formatted_props @ [Doc.text "/>"] in
   Doc.group
-   (Doc.concat
-      [
-        print_comments
-          (Doc.concat [Doc.less_than; name])
-          cmt_tbl tag_name.Asttypes.loc;
-        Doc.space;
-        Doc.indent (Doc.group (Doc.join formatted_props ~sep:Doc.line));
-      ]);
+    (Doc.concat
+       [
+         print_comments
+           (Doc.concat [Doc.less_than; name])
+           cmt_tbl tag_name.Asttypes.loc;
+         Doc.indent
+           (Doc.concat
+              [Doc.line; Doc.group (Doc.join formatted_props ~sep:Doc.line)]);
+       ])
 
 and print_jsx_container_tag ~state tag_name props
     (children : Parsetree.jsx_children) cmt_tbl =
@@ -4512,7 +4513,6 @@ and print_jsx_prop ~state prop cmt_tbl =
 
 and print_jsx_props ~state props cmt_tbl : Doc.t list =
   props |> List.map (fun prop -> print_jsx_prop ~state prop cmt_tbl)
-
 
 (* div -> div.
  * Navabar.createElement -> Navbar
