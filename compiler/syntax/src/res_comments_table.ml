@@ -1473,6 +1473,11 @@ and walk_expression expr t comments =
     let xs = exprs |> List.map (fun e -> Expression e) in
     walk_list xs t rest
   | Pexp_jsx_unary_element
+      {jsx_unary_element_tag_name = tag; jsx_unary_element_props = []} ->
+    let _, _, trailing = partition_by_loc comments tag.loc in
+    let after_expr, _ = partition_adjacent_trailing tag.loc trailing in
+    attach t.trailing tag.loc after_expr
+  | Pexp_jsx_unary_element
       {jsx_unary_element_tag_name = tag; jsx_unary_element_props = props} ->
     let _leading, inside, trailing = partition_by_loc comments tag.loc in
     walk_list

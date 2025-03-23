@@ -4547,7 +4547,6 @@ and print_jsx_prop ~state prop cmt_tbl =
       ]
 
 and print_jsx_props ~state props cmt_tbl : Doc.t list =
-  let () = CommentTable.log cmt_tbl in
   props |> List.map (fun prop -> print_jsx_prop ~state prop cmt_tbl)
 
 (* div -> div.
