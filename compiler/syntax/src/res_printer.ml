@@ -4531,11 +4531,18 @@ and print_jsx_prop ~state prop cmt_tbl =
       match Parens.jsx_prop_expr value with
       | Parenthesized | Braced _ ->
         let inner_doc = if Parens.braced_expr value then add_parens v else v in
-        let doc = Doc.concat [Doc.lbrace; inner_doc; Doc.rbrace] in
-        Doc.concat [(if is_optional then Doc.question else Doc.nil); doc]
+        Doc.concat [Doc.lbrace; inner_doc; Doc.rbrace]
       | _ -> v
     in
-    let doc = Doc.concat [Doc.text name.txt; Doc.equal; Doc.group value_doc] in
+    let doc =
+      Doc.concat
+        [
+          Doc.text name.txt;
+          Doc.equal;
+          (if is_optional then Doc.question else Doc.nil);
+          Doc.group value_doc;
+        ]
+    in
     print_comments doc cmt_tbl value.pexp_loc
   | JSXPropSpreading (loc, value) ->
     let value =
