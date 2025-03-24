@@ -1484,11 +1484,14 @@ and walk_expression expr t comments =
       (props
       |> List.filter_map (fun prop ->
              match prop with
-             | Parsetree.JSXPropPunning (_, _) -> None
+             | Parsetree.JSXPropPunning (_, {loc}) ->
+               Some (ExprArgument {expr; loc})
              | Parsetree.JSXPropValue ({loc}, _, expr) ->
                let loc = {loc with loc_end = expr.pexp_loc.loc_end} in
                Some (ExprArgument {expr; loc})
-             | Parsetree.JSXPropSpreading (_, _) -> None))
+             | Parsetree.JSXPropSpreading (loc, expr) ->
+               let loc = {loc with loc_end = expr.pexp_loc.loc_end} in
+               Some (ExprArgument {expr; loc})))
       t trailing;
     walk_expression expr t inside
   | Pexp_jsx_container_element

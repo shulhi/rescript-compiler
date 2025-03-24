@@ -4537,14 +4537,18 @@ and print_jsx_prop ~state prop cmt_tbl =
     in
     let doc = Doc.concat [Doc.text name.txt; Doc.equal; Doc.group value_doc] in
     print_comments doc cmt_tbl value.pexp_loc
-  | JSXPropSpreading (_, value) ->
-    Doc.concat
-      [
-        Doc.lbrace;
-        Doc.dotdotdot;
-        print_expression_with_comments ~state value cmt_tbl;
-        Doc.rbrace;
-      ]
+  | JSXPropSpreading (loc, value) ->
+    let value =
+      {value with pexp_loc = {value.pexp_loc with loc_start = loc.loc_start}}
+    in
+    Doc.group
+      (Doc.concat
+         [
+           Doc.lbrace;
+           Doc.dotdotdot;
+           print_expression_with_comments ~state value cmt_tbl;
+           Doc.rbrace;
+         ])
 
 and print_jsx_props ~state props cmt_tbl : Doc.t list =
   props |> List.map (fun prop -> print_jsx_prop ~state prop cmt_tbl)
