@@ -15,6 +15,7 @@
 #### :bug: Bug fix
 
 - Fix `Error.fromException`. https://github.com/rescript-lang/rescript/pull/7364
+- Fix formatter adds superfluous parens in pipe chain. https://github.com/rescript-lang/rescript/pull/7370
 
 #### :house: Internal
 
