@@ -15,12 +15,17 @@
 #### :bug: Bug fix
 
 - Fix `Error.fromException`. https://github.com/rescript-lang/rescript/pull/7364
+- Fix signature of `throw`. https://github.com/rescript-lang/rescript/pull/7365
 - Fix formatter adds superfluous parens in pipe chain. https://github.com/rescript-lang/rescript/pull/7370
 
 #### :house: Internal
 
 - Remove `Stdlib_Char` module for now. https://github.com/rescript-lang/rescript/pull/7367
 - Convert internal JavaScript codebase into ESM, ReScript package itself is now ESM (`"type": "module"`). https://github.com/rescript-lang/rescript/pull/6899
+
+#### :nail_care: Polish
+
+- More deprecations in `Pervasives`; add `Stdlib.Pair` and `Stdlib.Int.Ref`. https://github.com/rescript-lang/rescript/pull/7371
 
 # 12.0.0-alpha.10
 
