@@ -29,6 +29,7 @@
 
 - Fix broken `bstracing` CLI location. https://github.com/rescript-lang/rescript/pull/7398
 - Fix field flattening optimization to avoid creating unnecessary copies of allocating constants. https://github.com/rescript-lang/rescript-compiler/pull/7421
+- Fix leading comments removed when braces inside JSX contains `let` assignment. https://github.com/rescript-lang/rescript/pull/7424
 
 #### :house: Internal
 
