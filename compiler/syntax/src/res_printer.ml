@@ -5609,16 +5609,21 @@ and print_attributes ?loc ?(inline = false) ~state
     let doc_comment =
       match doc_comment_attrs with
       | [] -> Doc.nil
-      | attrs ->
-        Doc.group
-          (Doc.concat
-             [
-               Doc.join_with_sep
+      | doc_comment_attrs ->
+        let should_break =
+          match attrs with
+          | [] -> false
+          | _ -> true
+        in
+        Doc.concat
+          [
+            Doc.group
+              (Doc.join_with_sep
                  (List.map
                     (fun attr -> print_attribute ~state attr cmt_tbl)
-                    attrs);
-               Doc.hard_line;
-             ])
+                    doc_comment_attrs));
+            (if should_break then Doc.hard_line else Doc.nil);
+          ]
     in
     Doc.concat
       [
