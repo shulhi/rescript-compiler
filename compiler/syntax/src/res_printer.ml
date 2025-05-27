@@ -1550,35 +1550,12 @@ and print_constructor_declarations ~state ~private_flag
 and print_constructor_declaration2 ~state i
     (cd : Parsetree.constructor_declaration) cmt_tbl =
   let comment_attrs, attrs =
-    List.partition
-      (fun ((id, payload) : Parsetree.attribute) ->
-        match (id, payload) with
-        | ( {txt = "res.doc"},
-            PStr
-              [
-                {
-                  pstr_desc =
-                    Pstr_eval
-                      ({pexp_desc = Pexp_constant (Pconst_string (_, _))}, _);
-                };
-              ] ) ->
-          true
-        | _ -> false)
-      cd.pcd_attributes
+    ParsetreeViewer.partition_doc_comment_attributes cd.pcd_attributes
   in
   let comment_doc =
     match comment_attrs with
     | [] -> Doc.nil
-    | comment_attrs ->
-      Doc.concat
-        [
-          Doc.group
-            (Doc.join_with_sep
-               (List.map
-                  (fun attr -> print_attribute ~state attr cmt_tbl)
-                  comment_attrs));
-          Doc.hard_line;
-        ]
+    | comment_attrs -> print_doc_comments ~state cmt_tbl comment_attrs
   in
   let attrs = print_attributes ~state attrs cmt_tbl in
   let is_dot_dot_dot = cd.pcd_name.txt = "..." in
@@ -5600,6 +5577,15 @@ and print_bs_object_row ~state (lbl, expr) cmt_tbl =
   in
   print_comments doc cmt_tbl cmt_loc
 
+and print_doc_comments ~state cmt_tbl attrs =
+  Doc.concat
+    [
+      Doc.group
+        (Doc.join_with_sep
+           (List.map (fun attr -> print_attribute ~state attr cmt_tbl) attrs));
+      Doc.hard_line;
+    ]
+
 (* The optional loc indicates whether we need to print the attributes in
  * relation to some location. In practise this means the following:
  *  `@attr type t = string` -> on the same line, print on the same line
@@ -5612,21 +5598,7 @@ and print_attributes ?loc ?(inline = false) ~state
   | [] -> Doc.nil
   | attrs ->
     let comment_attrs, attrs =
-      List.partition
-        (fun ((id, payload) : Parsetree.attribute) ->
-          match (id, payload) with
-          | ( {txt = "res.doc"},
-              PStr
-                [
-                  {
-                    pstr_desc =
-                      Pstr_eval
-                        ({pexp_desc = Pexp_constant (Pconst_string (_, _))}, _);
-                  };
-                ] ) ->
-            true
-          | _ -> false)
-        attrs
+      ParsetreeViewer.partition_doc_comment_attributes attrs
     in
     let line_break =
       match loc with
@@ -5641,16 +5613,7 @@ and print_attributes ?loc ?(inline = false) ~state
     let comment_doc =
       match comment_attrs with
       | [] -> Doc.nil
-      | comment_attrs ->
-        Doc.concat
-          [
-            Doc.group
-              (Doc.join_with_sep
-                 (List.map
-                    (fun attr -> print_attribute ~state attr cmt_tbl)
-                    comment_attrs));
-            Doc.hard_line;
-          ]
+      | comment_attrs -> print_doc_comments ~state cmt_tbl comment_attrs
     in
     let attrs_doc =
       match attrs with
