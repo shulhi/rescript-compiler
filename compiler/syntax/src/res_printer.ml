@@ -1549,7 +1549,38 @@ and print_constructor_declarations ~state ~private_flag
 
 and print_constructor_declaration2 ~state i
     (cd : Parsetree.constructor_declaration) cmt_tbl =
-  let attrs = print_attributes ~state cd.pcd_attributes cmt_tbl in
+  let comment_attrs, attrs =
+    List.partition
+      (fun ((id, payload) : Parsetree.attribute) ->
+        match (id, payload) with
+        | ( {txt = "res.doc"},
+            PStr
+              [
+                {
+                  pstr_desc =
+                    Pstr_eval
+                      ({pexp_desc = Pexp_constant (Pconst_string (_, _))}, _);
+                };
+              ] ) ->
+          true
+        | _ -> false)
+      cd.pcd_attributes
+  in
+  let comment_doc =
+    match comment_attrs with
+    | [] -> Doc.nil
+    | comment_attrs ->
+      Doc.concat
+        [
+          Doc.group
+            (Doc.join_with_sep
+               (List.map
+                  (fun attr -> print_attribute ~state attr cmt_tbl)
+                  comment_attrs));
+          Doc.hard_line;
+        ]
+  in
+  let attrs = print_attributes ~state attrs cmt_tbl in
   let is_dot_dot_dot = cd.pcd_name.txt = "..." in
   let bar =
     if i > 0 || cd.pcd_attributes <> [] || is_dot_dot_dot then Doc.text "| "
@@ -1571,6 +1602,7 @@ and print_constructor_declaration2 ~state i
   in
   Doc.concat
     [
+      comment_doc;
       bar;
       Doc.group
         (Doc.concat
