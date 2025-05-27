@@ -5579,17 +5579,7 @@ and print_attributes ?loc ?(inline = false) ~state
   match ParsetreeViewer.filter_parsing_attrs attrs with
   | [] -> Doc.nil
   | attrs ->
-    let line_break =
-      match loc with
-      | None -> Doc.line
-      | Some loc -> (
-        match List.rev attrs with
-        | ({loc = first_loc}, _) :: _
-          when loc.loc_start.pos_lnum > first_loc.loc_end.pos_lnum ->
-          Doc.hard_line
-        | _ -> Doc.line)
-    in
-    let doc_comment_attrs, attrs =
+    let comment_attrs, attrs =
       List.partition
         (fun ((id, payload) : Parsetree.attribute) ->
           match (id, payload) with
@@ -5606,33 +5596,45 @@ and print_attributes ?loc ?(inline = false) ~state
           | _ -> false)
         attrs
     in
-    let doc_comment =
-      match doc_comment_attrs with
+    let line_break =
+      match loc with
+      | None -> Doc.line
+      | Some loc -> (
+        match List.rev attrs with
+        | ({loc = first_loc}, _) :: _
+          when loc.loc_start.pos_lnum > first_loc.loc_end.pos_lnum ->
+          Doc.hard_line
+        | _ -> Doc.space)
+    in
+    let comment_doc =
+      match comment_attrs with
       | [] -> Doc.nil
-      | doc_comment_attrs ->
-        let should_break =
-          match attrs with
-          | [] -> false
-          | _ -> true
-        in
+      | comment_attrs ->
         Doc.concat
           [
             Doc.group
               (Doc.join_with_sep
                  (List.map
                     (fun attr -> print_attribute ~state attr cmt_tbl)
-                    doc_comment_attrs));
-            (if should_break then Doc.hard_line else Doc.nil);
+                    comment_attrs));
+            Doc.hard_line;
           ]
     in
-    Doc.concat
-      [
-        doc_comment;
-        Doc.group
-          (Doc.join_with_sep
-             (List.map (fun attr -> print_attribute ~state attr cmt_tbl) attrs));
-        (if inline then Doc.space else line_break);
-      ]
+    let attrs_doc =
+      match attrs with
+      | [] -> Doc.nil
+      | _ ->
+        Doc.concat
+          [
+            Doc.group
+              (Doc.join_with_sep
+                 (List.map
+                    (fun attr -> print_attribute ~state attr cmt_tbl)
+                    attrs));
+            (if inline then Doc.space else line_break);
+          ]
+    in
+    Doc.concat [comment_doc; attrs_doc]
 
 and print_payload ~state (payload : Parsetree.payload) cmt_tbl =
   match payload with
