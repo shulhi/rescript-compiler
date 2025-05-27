@@ -5604,7 +5604,7 @@ and print_attributes ?loc ?(inline = false) ~state
         | ({loc = first_loc}, _) :: _
           when loc.loc_start.pos_lnum > first_loc.loc_end.pos_lnum ->
           Doc.hard_line
-        | _ -> Doc.space)
+        | _ -> if List.is_empty comment_attrs then Doc.line else Doc.space)
     in
     let comment_doc =
       match comment_attrs with
