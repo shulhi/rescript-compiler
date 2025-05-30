@@ -1579,8 +1579,8 @@ and print_constructor_declaration2 ~state i
   in
   Doc.concat
     [
-      comment_doc;
       bar;
+      comment_doc;
       Doc.group
         (Doc.concat
            [
@@ -1943,8 +1943,20 @@ and print_typ_expr ?inline_record_definitions ~(state : State.t)
   let doc =
     match typ_expr.ptyp_attributes with
     | _ :: _ as attrs when not should_print_its_own_attributes ->
-      Doc.group
-        (Doc.concat [print_attributes ~state attrs cmt_tbl; rendered_type])
+      let doc_comment_attr, attrs =
+        ParsetreeViewer.partition_doc_comment_attributes attrs
+      in
+      let comment_doc =
+        match doc_comment_attr with
+        | [] -> Doc.nil
+        | _ -> print_doc_comments ~state ~sep:Doc.space cmt_tbl doc_comment_attr
+      in
+      let attrs_doc =
+        match attrs with
+        | [] -> Doc.nil
+        | _ -> print_attributes ~state attrs cmt_tbl
+      in
+      Doc.group (Doc.concat [comment_doc; attrs_doc; rendered_type])
     | _ -> rendered_type
   in
   print_comments doc cmt_tbl typ_expr.ptyp_loc
@@ -5577,13 +5589,13 @@ and print_bs_object_row ~state (lbl, expr) cmt_tbl =
   in
   print_comments doc cmt_tbl cmt_loc
 
-and print_doc_comments ~state cmt_tbl attrs =
+and print_doc_comments ~state ?(sep = Doc.hard_line) cmt_tbl attrs =
   Doc.concat
     [
       Doc.group
         (Doc.join_with_sep
            (List.map (fun attr -> print_attribute ~state attr cmt_tbl) attrs));
-      Doc.hard_line;
+      sep;
     ]
 
 (* The optional loc indicates whether we need to print the attributes in
