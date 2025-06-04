@@ -4896,8 +4896,7 @@ and parse_type_constructor_declaration_with_bar p =
         | Bar -> true
         | _ -> false)
   in
-  match p.Parser.token with
-  | _ when is_constructor_with_bar p ->
+  if is_constructor_with_bar p then (
     let doc_comment_attrs =
       match p.Parser.token with
       | DocComment (loc, s) ->
@@ -4913,8 +4912,8 @@ and parse_type_constructor_declaration_with_bar p =
         constr with
         Parsetree.pcd_attributes =
           doc_comment_attrs @ constr.Parsetree.pcd_attributes;
-      }
-  | _ -> None
+      })
+  else None
 
 and parse_type_constructor_declaration ~start_pos p =
   Parser.leave_breadcrumb p Grammar.ConstructorDeclaration;
