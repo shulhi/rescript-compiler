@@ -47,6 +47,8 @@
 - Improve error message for trying to define a type inside a function. https://github.com/rescript-lang/rescript/pull/7843
 - Refactor CLI to use spawn for better signal handling in watch mode. https://github.com/rescript-lang/rescript/pull/7844
 
+- Add a `prepareRename` command the LSP can use for faster renames. https://github.com/rescript-lang/rescript/pull/7847
+
 # 12.0.0-beta.9
 
 #### :boom: Breaking Change
