@@ -42,6 +42,7 @@
 #### :rocket: New Feature
 
 - Add `Array.filterMapWithIndex` to Stdlib. https://github.com/rescript-lang/rescript/pull/7876
+- Add `littleEndian` feature for `DataView` to Stdlib. https://github.com/rescript-lang/rescript/pull/7881
 
 #### :bug: Bug fix
 
