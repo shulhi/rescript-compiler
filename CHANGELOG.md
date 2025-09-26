@@ -21,6 +21,7 @@
 #### :bug: Bug fix
 
 - Fix result examples. https://github.com/rescript-lang/rescript/pull/7914
+- Make inline record fields that overlap with a variant's tag a compile error. https://github.com/rescript-lang/rescript/pull/7875
 
 #### :memo: Documentation
 
