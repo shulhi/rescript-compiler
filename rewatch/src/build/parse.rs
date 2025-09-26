@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn generate_asts(
-    build_state: &mut BuildState,
+    build_state: &mut BuildCommandState,
     inc: impl Fn() + std::marker::Sync,
 ) -> anyhow::Result<String> {
     let mut has_failure = false;
@@ -52,14 +52,21 @@ pub fn generate_asts(
                             package.to_owned(),
                             &source_file.implementation.path.to_owned(),
                             build_state,
+                            build_state.get_warn_error_override(),
                         )
                         .map_err(|e| e.to_string());
 
                         let iast_result = match source_file.interface.as_ref().map(|i| i.path.to_owned()) {
                             Some(interface_file_path) => {
-                                generate_ast(package.to_owned(), &interface_file_path.to_owned(), build_state)
-                                    .map_err(|e| e.to_string())
-                                    .map(Some)
+                                match generate_ast(
+                                    package.to_owned(),
+                                    &interface_file_path.to_owned(),
+                                    build_state,
+                                    build_state.get_warn_error_override(),
+                                ) {
+                                    Ok(v) => Ok(Some(v)),
+                                    Err(e) => Err(e.to_string()),
+                                }
                             }
                             _ => Ok(None),
                         };
@@ -94,7 +101,24 @@ pub fn generate_asts(
         )>>()
         .into_iter()
         .for_each(|(module_name, ast_result, iast_result, is_dirty)| {
-            if let Some(module) = build_state.modules.get_mut(&module_name) {
+            // Get package name first to avoid borrow checker issues
+            let package_name = build_state
+                .build_state
+                .modules
+                .get(&module_name)
+                .map(|module| module.package_name.clone())
+                .unwrap_or_else(|| {
+                    eprintln!("Module not found: {module_name}");
+                    String::new()
+                });
+
+            let package = build_state
+                .build_state
+                .packages
+                .get(&package_name)
+                .expect("Package not found");
+
+            if let Some(module) = build_state.build_state.modules.get_mut(&module_name) {
                 // if the module is dirty, mark it also compile_dirty
                 // do NOT set to false if the module is not parse_dirty, it needs to keep
                 // the compile_dirty flag if it was set before
@@ -102,10 +126,6 @@ pub fn generate_asts(
                     module.compile_dirty = true;
                     module.deps_dirty = true;
                 }
-                let package = build_state
-                    .packages
-                    .get(&module.package_name)
-                    .expect("Package not found");
                 if let SourceType::SourceFile(ref mut source_file) = module.source_type {
                     // We get Err(x) when there is a parse error. When it's Ok(_, Some(
                     // stderr_warnings )), the outputs are warnings
@@ -180,65 +200,71 @@ pub fn generate_asts(
         .map(|(_, module)| module.package_name.clone())
         .collect::<AHashSet<String>>();
 
-    build_state.modules.iter_mut().for_each(|(module_name, module)| {
-        let is_dirty = match &module.source_type {
-            SourceType::MlMap(_) => {
-                if dirty_packages.contains(&module.package_name) {
-                    let package = build_state
-                        .packages
-                        .get(&module.package_name)
-                        .expect("Package not found");
-                    // probably better to do this in a different function
-                    // specific to compiling mlmaps
-                    let compile_path = package.get_mlmap_compile_path();
-                    let mlmap_hash = helpers::compute_file_hash(Path::new(&compile_path));
-                    if let Err(err) = namespaces::compile_mlmap(
-                        &build_state.project_context,
-                        package,
-                        module_name,
-                        &build_state.compiler_info.bsc_path,
-                    ) {
-                        has_failure = true;
-                        stderr.push_str(&format!("{err}\n"));
-                    }
-                    let mlmap_hash_after = helpers::compute_file_hash(Path::new(&compile_path));
+    // Collect package names first to avoid borrow checker issues
+    let module_package_pairs = build_state.module_name_package_pairs();
 
-                    let suffix = package
-                        .namespace
-                        .to_suffix()
-                        .expect("namespace should be set for mlmap module");
-                    let base_build_path = package.get_build_path().join(&suffix);
-                    let base_ocaml_build_path = package.get_ocaml_build_path().join(&suffix);
-                    let _ = std::fs::copy(
-                        base_build_path.with_extension("cmi"),
-                        base_ocaml_build_path.with_extension("cmi"),
-                    );
-                    let _ = std::fs::copy(
-                        base_build_path.with_extension("cmt"),
-                        base_ocaml_build_path.with_extension("cmt"),
-                    );
-                    let _ = std::fs::copy(
-                        base_build_path.with_extension("cmj"),
-                        base_ocaml_build_path.with_extension("cmj"),
-                    );
-                    let _ = std::fs::copy(
-                        base_build_path.with_extension("mlmap"),
-                        base_ocaml_build_path.with_extension("mlmap"),
-                    );
-                    match (mlmap_hash, mlmap_hash_after) {
-                        (Some(digest), Some(digest_after)) => !digest.eq(&digest_after),
-                        _ => true,
+    for (module_name, package_name) in module_package_pairs {
+        if let Some(module) = build_state.build_state.modules.get_mut(&module_name) {
+            let is_dirty = match &module.source_type {
+                SourceType::MlMap(_) => {
+                    if dirty_packages.contains(&package_name) {
+                        let package = build_state
+                            .build_state
+                            .packages
+                            .get(&package_name)
+                            .expect("Package not found");
+                        // probably better to do this in a different function
+                        // specific to compiling mlmaps
+                        let compile_path = package.get_mlmap_compile_path();
+                        let mlmap_hash = helpers::compute_file_hash(Path::new(&compile_path));
+                        if let Err(err) = namespaces::compile_mlmap(
+                            &build_state.build_state.project_context,
+                            package,
+                            &module_name,
+                            &build_state.build_state.compiler_info.bsc_path,
+                        ) {
+                            has_failure = true;
+                            stderr.push_str(&format!("{err}\n"));
+                        }
+                        let mlmap_hash_after = helpers::compute_file_hash(Path::new(&compile_path));
+
+                        let suffix = package
+                            .namespace
+                            .to_suffix()
+                            .expect("namespace should be set for mlmap module");
+                        let base_build_path = package.get_build_path().join(&suffix);
+                        let base_ocaml_build_path = package.get_ocaml_build_path().join(&suffix);
+                        let _ = std::fs::copy(
+                            base_build_path.with_extension("cmi"),
+                            base_ocaml_build_path.with_extension("cmi"),
+                        );
+                        let _ = std::fs::copy(
+                            base_build_path.with_extension("cmt"),
+                            base_ocaml_build_path.with_extension("cmt"),
+                        );
+                        let _ = std::fs::copy(
+                            base_build_path.with_extension("cmj"),
+                            base_ocaml_build_path.with_extension("cmj"),
+                        );
+                        let _ = std::fs::copy(
+                            base_build_path.with_extension("mlmap"),
+                            base_ocaml_build_path.with_extension("mlmap"),
+                        );
+                        match (mlmap_hash, mlmap_hash_after) {
+                            (Some(digest), Some(digest_after)) => !digest.eq(&digest_after),
+                            _ => true,
+                        }
+                    } else {
+                        false
                     }
-                } else {
-                    false
                 }
+                _ => false,
+            };
+            if is_dirty {
+                module.compile_dirty = is_dirty;
             }
-            _ => false,
-        };
-        if is_dirty {
-            module.compile_dirty = is_dirty;
         }
-    });
+    }
 
     if has_failure {
         Err(anyhow!(stderr))
@@ -252,6 +278,8 @@ pub fn parser_args(
     package_config: &Config,
     filename: &Path,
     contents: &str,
+    is_local_dep: bool,
+    warn_error_override: Option<String>,
 ) -> anyhow::Result<(PathBuf, Vec<String>)> {
     let root_config = project_context.get_root_config();
     let file = &filename;
@@ -267,6 +295,7 @@ pub fn parser_args(
     let jsx_preserve_args = root_config.get_jsx_preserve_args();
     let experimental_features_args = root_config.get_experimental_features_args();
     let bsc_flags = config::flatten_flags(&package_config.compiler_flags);
+    let warning_args = package_config.get_warning_args(is_local_dep, warn_error_override);
 
     let file = PathBuf::from("..").join("..").join(file);
 
@@ -279,6 +308,7 @@ pub fn parser_args(
             jsx_mode_args,
             jsx_preserve_args,
             experimental_features_args,
+            warning_args,
             bsc_flags,
             vec![
                 "-absname".to_string(),
@@ -296,13 +326,20 @@ fn generate_ast(
     package: Package,
     filename: &Path,
     build_state: &BuildState,
+    warn_error_override: Option<String>,
 ) -> anyhow::Result<(PathBuf, Option<helpers::StdErr>)> {
     let file_path = PathBuf::from(&package.path).join(filename);
     let contents = helpers::read_file(&file_path).expect("Error reading file");
 
     let build_path_abs = package.get_build_path();
-    let (ast_path, parser_args) =
-        parser_args(&build_state.project_context, &package.config, filename, &contents)?;
+    let (ast_path, parser_args) = parser_args(
+        &build_state.project_context,
+        &package.config,
+        filename,
+        &contents,
+        package.is_local_dep,
+        warn_error_override,
+    )?;
 
     // generate the dir of the ast_path (it mirrors the source file dir)
     let ast_parent_path = package.get_build_path().join(ast_path.parent().unwrap());
