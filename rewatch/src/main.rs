@@ -1,14 +1,13 @@
 use anyhow::Result;
-use clap::Parser;
 use log::LevelFilter;
 use std::{io::Write, path::Path};
 
 use rescript::{build, cli, cmd, format, lock, watcher};
 
 fn main() -> Result<()> {
-    let args = cli::Cli::parse();
+    let cli = cli::parse_with_default().unwrap_or_else(|err| err.exit());
 
-    let log_level_filter = args.verbose.log_level_filter();
+    let log_level_filter = cli.verbose.log_level_filter();
 
     env_logger::Builder::new()
         .format(|buf, record| writeln!(buf, "{}:\n{}", record.level(), record.args()))
@@ -16,7 +15,7 @@ fn main() -> Result<()> {
         .target(env_logger::fmt::Target::Stdout)
         .init();
 
-    let mut command = args.command.unwrap_or(cli::Command::Build(args.build_args));
+    let mut command = cli.command;
 
     if let cli::Command::Build(build_args) = &command {
         if build_args.watch {
