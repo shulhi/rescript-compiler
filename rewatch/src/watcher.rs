@@ -62,7 +62,6 @@ struct AsyncWatchArgs<'a> {
     filter: &'a Option<regex::Regex>,
     after_build: Option<String>,
     create_sourcedirs: bool,
-    build_dev_deps: bool,
     snapshot_output: bool,
     warn_error: Option<String>,
 }
@@ -75,21 +74,13 @@ async fn async_watch(
         filter,
         after_build,
         create_sourcedirs,
-        build_dev_deps,
         snapshot_output,
         warn_error,
     }: AsyncWatchArgs<'_>,
 ) -> notify::Result<()> {
-    let mut build_state: build::build_types::BuildCommandState = build::initialize_build(
-        None,
-        filter,
-        show_progress,
-        path,
-        build_dev_deps,
-        snapshot_output,
-        warn_error,
-    )
-    .expect("Can't initialize build");
+    let mut build_state: build::build_types::BuildCommandState =
+        build::initialize_build(None, filter, show_progress, path, snapshot_output, warn_error)
+            .expect("Can't initialize build");
     let mut needs_compile_type = CompileType::Incremental;
     // create a mutex to capture if ctrl-c was pressed
     let ctrlc_pressed = Arc::new(Mutex::new(false));
@@ -283,7 +274,6 @@ async fn async_watch(
                     filter,
                     show_progress,
                     path,
-                    build_dev_deps,
                     snapshot_output,
                     build_state.get_warn_error_override(),
                 )
@@ -331,7 +321,6 @@ pub fn start(
     folder: &str,
     after_build: Option<String>,
     create_sourcedirs: bool,
-    build_dev_deps: bool,
     snapshot_output: bool,
     warn_error: Option<String>,
 ) {
@@ -358,7 +347,6 @@ pub fn start(
             filter,
             after_build,
             create_sourcedirs,
-            build_dev_deps,
             snapshot_output,
             warn_error: warn_error.clone(),
         })

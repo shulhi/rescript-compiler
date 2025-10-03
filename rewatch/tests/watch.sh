@@ -36,9 +36,9 @@ success "Watcher Started"
 # Trigger a recompilation
 echo 'Js.log("added-by-test")' >> ./packages/main/src/Main.res
 
-# Wait for the compiled JS to show up (Windows CI can be slower)
+# Wait for the compiled JS to show up (can be slow in CI)
 target=./packages/main/src/Main.mjs
-if ! wait_for_file "$target" 10; then
+if ! wait_for_file "$target" 20; then
   error "Expected output not found: $target"
   ls -la ./packages/main/src || true
   tail -n 200 rewatch.log || true
@@ -59,7 +59,7 @@ sleep 1
 
 replace '/Js.log("added-by-test")/d' ./packages/main/src/Main.res;
 
-sleep 1
+sleep 5
 
 if git diff --exit-code ./
 then
