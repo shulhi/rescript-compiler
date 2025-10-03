@@ -58,9 +58,9 @@ try {
 
 ## Exceptions
 
-- Raises a SyntaxError (Exn.t) if the string isn't valid JSON.
+- Throws a SyntaxError (Exn.t) if the string isn't valid JSON.
 */
-@raises(Exn.t) @val
+@val
 external parseOrThrow: (string, ~reviver: (string, t) => t=?) => t = "JSON.parse"
 
 /** 
@@ -104,9 +104,9 @@ try {
 
 ## Exceptions
 
-- Raises a SyntaxError (Exn.t) if the string isn't valid JSON.
+- Throws a SyntaxError (Exn.t) if the string isn't valid JSON.
 */
-@deprecated("Use `parseOrThrow` instead") @raises(Exn.t) @val
+@deprecated("Use `parseOrThrow` instead") @val
 external parseExn: (string, ~reviver: (string, t) => t=?) => t = "JSON.parse"
 
 /** 
@@ -140,9 +140,9 @@ try {
 
 ## Exceptions
 
-- Raises a SyntaxError if the string is not a valid JSON.
+- Throws a SyntaxError if the string is not a valid JSON.
 */
-@deprecated("Use `parseOrThrow` with optional parameter instead") @raises(Exn.t) @val
+@deprecated("Use `parseOrThrow` with optional parameter instead") @val
 external parseExnWithReviver: (string, (string, t) => t) => t = "JSON.parse"
 
 /** 
@@ -387,7 +387,7 @@ dict
 
 JSON.stringifyAny(() => "hello world") == None
 
-// Raise a exception
+// Throw a exception
 switch BigInt.fromInt(0)->JSON.stringifyAny {
 | exception _ => assert(true)
 | _ => assert(false)
@@ -396,10 +396,10 @@ switch BigInt.fromInt(0)->JSON.stringifyAny {
 
 ## Exceptions
 
-- Raises a TypeError if the value contains circular references.
-- Raises a TypeError if the value contains `BigInt`s.
+- Throws a TypeError if the value contains circular references.
+- Throws a TypeError if the value contains `BigInt`s.
 */
-@raises(Exn.t) @val
+@val
 external stringifyAny: ('a, ~replacer: replacer=?, ~space: int=?) => option<string> =
   "JSON.stringify"
 
@@ -438,10 +438,10 @@ switch BigInt.fromInt(0)->JSON.stringifyAny {
 
 ## Exceptions
 
-- Raises a TypeError if the value contains circular references.
-- Raises a TypeError if the value contains `BigInt`s.
+- Throws a TypeError if the value contains circular references.
+- Throws a TypeError if the value contains `BigInt`s.
 */
-@deprecated("Use `stringifyAny` with optional parameter instead") @raises(Exn.t) @val
+@deprecated("Use `stringifyAny` with optional parameter instead") @val
 external stringifyAnyWithIndent: ('a, @as(json`null`) _, int) => option<string> = "JSON.stringify"
 
 /** 
@@ -484,10 +484,10 @@ switch BigInt.fromInt(0)->JSON.stringifyAny {
 
 ## Exceptions
 
-- Raises a TypeError if the value contains circular references.
-- Raises a TypeError if the value contains `BigInt`s.
+- Throws a TypeError if the value contains circular references.
+- Throws a TypeError if the value contains `BigInt`s.
 */
-@deprecated("Use `stringifyAny` with optional parameter instead") @raises @val
+@deprecated("Use `stringifyAny` with optional parameter instead") @val
 external stringifyAnyWithReplacer: ('a, (string, t) => t) => option<string> = "JSON.stringify"
 
 /** 
@@ -531,10 +531,10 @@ switch BigInt.fromInt(0)->JSON.stringifyAny {
 
 ## Exceptions
 
-- Raises a TypeError if the value contains circular references.
-- Raises a TypeError if the value contains `BigInt`s.
+- Throws a TypeError if the value contains circular references.
+- Throws a TypeError if the value contains `BigInt`s.
 */
-@deprecated("Use `stringifyAny` with optional parameters instead") @raises @val
+@deprecated("Use `stringifyAny` with optional parameters instead") @val
 external stringifyAnyWithReplacerAndIndent: ('a, (string, t) => t, int) => option<string> =
   "JSON.stringify"
 
@@ -568,10 +568,10 @@ switch BigInt.fromInt(0)->JSON.stringifyAny {
 
 ## Exceptions
 
-- Raises a TypeError if the value contains circular references.
-- Raises a TypeError if the value contains `BigInt`s.
+- Throws a TypeError if the value contains circular references.
+- Throws a TypeError if the value contains `BigInt`s.
 */
-@deprecated("Use `stringifyAny` with optional parameter instead") @raises @val
+@deprecated("Use `stringifyAny` with optional parameter instead") @val
 external stringifyAnyWithFilter: ('a, array<string>) => string = "JSON.stringify"
 
 /** 
@@ -618,10 +618,10 @@ switch BigInt.fromInt(0)->JSON.stringifyAny {
 
 ## Exceptions
 
-- Raises a TypeError if the value contains circular references.
-- Raises a TypeError if the value contains `BigInt`s.
+- Throws a TypeError if the value contains circular references.
+- Throws a TypeError if the value contains `BigInt`s.
 */
-@deprecated("Use `stringifyAny` with optional parameters instead") @raises @val
+@deprecated("Use `stringifyAny` with optional parameters instead") @val
 external stringifyAnyWithFilterAndIndent: ('a, array<string>, int) => string = "JSON.stringify"
 
 module Classify: {
