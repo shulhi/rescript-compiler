@@ -1,4 +1,5 @@
 use anyhow::Result;
+use console::Term;
 use log::LevelFilter;
 use std::{io::Write, path::Path};
 
@@ -24,6 +25,9 @@ fn main() -> Result<()> {
         }
     }
 
+    let is_tty: bool = Term::stdout().is_term() && Term::stderr().is_term();
+    let plain_output = !is_tty;
+
     // The 'normal run' mode will show the 'pretty' formatted progress. But if we turn off the log
     // level, we should never show that.
     let show_progress = log_level_filter == LevelFilter::Info;
@@ -48,7 +52,7 @@ fn main() -> Result<()> {
                 show_progress,
                 build_args.no_timing,
                 *build_args.create_sourcedirs,
-                *build_args.snapshot_output,
+                plain_output,
                 build_args.warn_error.clone(),
             ) {
                 Err(e) => {
@@ -78,17 +82,13 @@ fn main() -> Result<()> {
                 &watch_args.folder,
                 (*watch_args.after_build).clone(),
                 *watch_args.create_sourcedirs,
-                *watch_args.snapshot_output,
+                plain_output,
                 watch_args.warn_error.clone(),
             );
 
             Ok(())
         }
-        cli::Command::Clean {
-            folder,
-            snapshot_output,
-            dev,
-        } => {
+        cli::Command::Clean { folder, dev } => {
             let _lock = get_lock(&folder);
 
             if dev.dev {
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
                 );
             }
 
-            build::clean::clean(Path::new(&folder as &str), show_progress, *snapshot_output)
+            build::clean::clean(Path::new(&folder as &str), show_progress, plain_output)
         }
         cli::Command::Format {
             stdin,
