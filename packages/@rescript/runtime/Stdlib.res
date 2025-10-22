@@ -62,6 +62,23 @@ type lazy_t<+'a> = Lazy.t<'a>
 
 @deprecated("Use rescript-webapi instead") @val external window: Dom.window = "window"
 @deprecated("Use rescript-webapi instead") @val external document: Dom.document = "document"
+/**
+`globalThis` gives you the host global object (`window` in browsers, `global` in Node, etc.).
+You can reach shared globals from any runtime without special checks.
+
+## Examples
+
+**Note:** These are demonstrative examples. In real code, prefer writing your own type-safe bindings.
+See [`Bind to Global JS Values`](https://rescript-lang.org/docs/manual/v12.0.0/bind-to-global-js-values).
+
+
+```rescript
+typeof(globalThis["setTimeout"]) == #function
+
+globalThis["myAppName"] = "SuperApp";
+globalThis["myAppName"] == "SuperApp"
+```
+*/
 @val external globalThis: {..} = "globalThis"
 
 /**
@@ -106,6 +123,20 @@ async function main() {
 */
 external import: 'a => promise<'a> = "%import"
 
+/**
+`panic(message)` throws a JavaScript `Error` prefixed with `Panic!`.
+Call it when something went wrong and the program should stop right away.
+
+## Examples
+
+```rescript
+let caught = try panic("Invariant violated") catch {
+| JsExn(err) => JsExn.message(err)->Option.getOrThrow
+}
+
+caught == "Panic! Invariant violated"
+```
+*/
 let panic = JsError.panic
 
 /**
@@ -123,6 +154,37 @@ let assertEqual = (a, b) => {
   }
 }
 
+/**
+`null` returns the JavaScript `null` value as a `nullable<'a>`.
+Use the `Nullable` helpers to convert it into an `option` or to read the value.
+
+## Examples
+
+```rescript
+null->Nullable.toOption == None
+```
+*/
 external null: nullable<'a> = "#null"
+/**
+`undefined` returns the JavaScript `undefined` value as a `nullable<'a>`.
+Use the `Nullable` helpers to convert it into an `option` or to read the value.
+
+## Examples
+
+```rescript
+undefined->Nullable.toOption == None
+```
+*/
 external undefined: nullable<'a> = "#undefined"
+/**
+`typeof(value)` exposes JavaScript's `typeof` operator and returns a `Type.t` enum.
+It helps you inspect values that come from JavaScript APIs.
+
+## Examples
+
+```rescript
+typeof(1) == #number
+typeof("a") == #string
+```
+*/
 external typeof: 'a => Type.t = "#typeof"
