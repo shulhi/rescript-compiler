@@ -37,6 +37,36 @@ switch dict->Dict.get("someKey") {
 | Some(value) => Console.log(value)
 }
 ```
+
+## Alternative: Pattern Matching with `dict{}`
+
+For nested dictionary access, consider using the more concise `dict{}` pattern matching syntax:
+
+```rescript
+// More concise approach using pattern matching
+let decodeImageUrl = (json: JSON.t) => {
+  switch json {
+  | JSON.Object(dict{"data": JSON.Object(dict{"image_url": JSON.String(url)})}) => Some(url)
+  | _ => None
+  }
+}
+
+// Alternative using Dict.get
+let decodeImageUrl = (json: JSON.t) => {
+  switch json {
+  | JSON.Object(obj) =>
+    switch Dict.get(obj, "data") {
+    | Some(JSON.Object(data)) =>
+      switch Dict.get(data, "image_url") {
+      | Some(JSON.String(url)) => Some(url)
+      | _ => None
+      }
+    | _ => None
+    }
+  | _ => None
+  }
+}
+```
 */
 @get_index
 external get: (dict<'a>, string) => option<'a> = ""
