@@ -14,6 +14,8 @@
 
 #### :boom: Breaking Change
 
+- Fix some Intl bindings (`Intl.Collator.supportedLocalesOf`, `Intl.DateTimeFormat.supportedLocalesOf`, `Intl.ListFormat.supportedLocalesOf`, `Intl.NumberFormat.supportedLocalesOf`, `Intl.PluralRules.supportedLocalesOf`, `Intl.RelativeTimeFormat.supportedLocalesOf`, `Intl.Segmenter.supportedLocalesOf`) which return `array<string>` and not their corresponding main type `t`. Also remove `Intl.PluralRules.selectBigInt` and `Intl.PluralRules.selectRangeBigInt` which don't work in many JS runtimes. https://github.com/rescript-lang/rescript/pull/7995
+
 #### :eyeglasses: Spec Compliance
 
 #### :rocket: New Feature
