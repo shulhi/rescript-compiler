@@ -95,14 +95,22 @@ clean-ninja:
 
 REWATCH_SOURCES = $(shell find rewatch/src -name '*.rs') rewatch/Cargo.toml rewatch/Cargo.lock rewatch/rust-toolchain.toml
 RESCRIPT_EXE = $(BIN_DIR)/rescript.exe
+ifdef CI
+	REWATCH_PROFILE := release
+	REWATCH_CARGO_FLAGS := --release
+else
+	REWATCH_PROFILE := debug
+	REWATCH_CARGO_FLAGS :=
+endif
+REWATCH_TARGET := rewatch/target/$(REWATCH_PROFILE)/rescript$(PLATFORM_EXE_EXT)
 
 rewatch: $(RESCRIPT_EXE)
 
-$(RESCRIPT_EXE): rewatch/target/debug/rescript$(PLATFORM_EXE_EXT)
+$(RESCRIPT_EXE): $(REWATCH_TARGET)
 	$(call COPY_EXE,$<,$@)
 
-rewatch/target/debug/rescript$(PLATFORM_EXE_EXT): $(REWATCH_SOURCES)
-	cargo build --manifest-path rewatch/Cargo.toml
+$(REWATCH_TARGET): $(REWATCH_SOURCES)
+	cargo build --manifest-path rewatch/Cargo.toml $(REWATCH_CARGO_FLAGS)
 
 clean-rewatch:
 	cargo clean --manifest-path rewatch/Cargo.toml && rm -rf rewatch/target && rm -f $(RESCRIPT_EXE)
@@ -182,26 +190,46 @@ test-rewatch: lib
 
 test-all: test test-gentype test-analysis test-tools test-rewatch
 
-# Builds the core playground bundle (without the relevant cmijs files for the runtime)
-playground: | $(YARN_INSTALL_STAMP)
-	dune build --profile browser
-	cp -f ./_build/default/compiler/jsoo/jsoo_playground_main.bc.js packages/playground/compiler.js
+# Playground
+
+PLAYGROUND_BUILD_DIR := ./_build_playground
+PLAYGROUND_BUILD_STAMP := $(PLAYGROUND_BUILD_DIR)/log # touched by dune on each build
+PLAYGROUND_COMPILER := packages/playground/compiler.js
+PLAYGROUND_CMI_BUILD_STAMP := packages/playground/.buildstamp # touched by playground npm build script
+
+playground: playground-compiler playground-cmijs
+
+playground-compiler: $(PLAYGROUND_COMPILER)
+
+$(PLAYGROUND_COMPILER): $(PLAYGROUND_BUILD_STAMP)
+
+$(PLAYGROUND_BUILD_STAMP): $(COMPILER_SOURCES)
+	dune build --profile browser --build-dir $(PLAYGROUND_BUILD_DIR)
+	cp -f $(PLAYGROUND_BUILD_DIR)/default/compiler/jsoo/jsoo_playground_main.bc.js $(PLAYGROUND_COMPILER)
 
 # Creates all the relevant core and third party cmij files to side-load together with the playground bundle
-playground-cmijs: | $(YARN_INSTALL_STAMP) # should also depend on artifacts, but that causes an attempt to copy binaries for JSOO
+playground-cmijs: $(PLAYGROUND_CMI_BUILD_STAMP)
+
+$(PLAYGROUND_CMI_BUILD_STAMP): $(RUNTIME_BUILD_STAMP) $(NINJA_EXE)
 	yarn workspace playground build
+
+playground-test: playground
+	yarn workspace playground test
 
 # Builds the playground, runs some e2e tests and releases the playground to the
 # Cloudflare R2 (requires Rclone `rescript:` remote)
-playground-release: playground playground-cmijs | $(YARN_INSTALL_STAMP)
-	yarn workspace playground test
+playground-release: playground-test
 	yarn workspace playground upload-bundle
+
+# Format
 
 format: | $(YARN_INSTALL_STAMP)
 	./scripts/format.sh
 
 checkformat: | $(YARN_INSTALL_STAMP)
 	./scripts/format_check.sh
+
+# Clean
 
 clean-gentype:
 	make -C tests/gentype_tests/typescript-react-example clean
@@ -216,4 +244,4 @@ dev-container:
 
 .DEFAULT_GOAL := build
 
-.PHONY: yarn-install build ninja rewatch compiler lib artifacts bench test test-analysis test-tools test-syntax test-syntax-roundtrip test-gentype test-rewatch test-all playground playground-cmijs playground-release format checkformat clean-ninja clean-rewatch clean-compiler clean-lib clean-gentype clean-tests clean dev-container
+.PHONY: yarn-install build ninja rewatch compiler lib artifacts bench test test-analysis test-tools test-syntax test-syntax-roundtrip test-gentype test-rewatch test-all playground playground-compiler playground-test playground-cmijs playground-release format checkformat clean-ninja clean-rewatch clean-compiler clean-lib clean-gentype clean-tests clean dev-container
