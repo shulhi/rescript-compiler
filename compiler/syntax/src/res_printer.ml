@@ -3985,7 +3985,49 @@ and print_binary_expression ~state (expr : Parsetree.expression) cmt_tbl =
     ->
     let lhs_has_comment_below = has_comment_below cmt_tbl lhs.pexp_loc in
     let lhs_doc = print_operand ~is_lhs:true ~is_multiline:false lhs op in
-    let rhs_doc = print_operand ~is_lhs:false ~is_multiline:false rhs op in
+    let rhs_doc =
+      (* For pipe operator, if RHS is (__x) => f(__x, ...), remove the first __x arg
+         so it prints as a->f(...) instead of a->f(_, ...) *)
+      let rhs_to_print =
+        match rhs.pexp_desc with
+        | Pexp_fun
+            {
+              arg_label = Nolabel;
+              default = None;
+              lhs = {ppat_desc = Ppat_var {txt = "__x"}} as pat;
+              rhs =
+                {pexp_desc = Pexp_apply {funct; args; partial; transformed_jsx}}
+                as body;
+              arity;
+              async;
+            } -> (
+          match args with
+          | (Nolabel, {pexp_desc = Pexp_ident {txt = Longident.Lident "__x"}})
+            :: rest_args ->
+            {
+              rhs with
+              pexp_desc =
+                Pexp_fun
+                  {
+                    arg_label = Nolabel;
+                    default = None;
+                    lhs = pat;
+                    rhs =
+                      {
+                        body with
+                        pexp_desc =
+                          Pexp_apply
+                            {funct; args = rest_args; partial; transformed_jsx};
+                      };
+                    arity;
+                    async;
+                  };
+            }
+          | _ -> rhs)
+        | _ -> rhs
+      in
+      print_operand ~is_lhs:false ~is_multiline:false rhs_to_print op
+    in
     Doc.group
       (Doc.concat
          [
