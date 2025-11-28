@@ -161,8 +161,9 @@ let rewrite_underscore_apply_in_pipe expr =
           (fun arg ->
             match arg with
             | ( lbl,
-                ({pexp_desc = Pexp_ident ({txt = Longident.Lident "__x"} as lid)}
-                 as arg_expr) ) ->
+                ({
+                   pexp_desc = Pexp_ident ({txt = Longident.Lident "__x"} as lid);
+                 } as arg_expr) ) ->
               ( lbl,
                 {
                   arg_expr with
