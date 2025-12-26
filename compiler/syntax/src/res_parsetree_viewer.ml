@@ -142,6 +142,7 @@ let rewrite_underscore_apply expr =
   | _ -> expr
 
 (* For pipe RHS: (__x) => f(__x, a, b) -----> f(a, b)
+   Note: Ppat_var "__x" and Pexp_ident "__x" represent `_` placeholders in user code.
    Omits the first __x argument only if it's the sole occurrence.
    If multiple __x exist (e.g., f(__x, __x, b)), keeps all to preserve semantics. *)
 let rewrite_underscore_apply_in_pipe expr =

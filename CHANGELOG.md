@@ -26,6 +26,7 @@
 - Fix: do not warn for "editor" field in `rescript.json`. https://github.com/rescript-lang/rescript/pull/8084
 - Fix `@val` shadowing (rewrite using `globalThis`). https://github.com/rescript-lang/rescript/pull/8098
 - Fix `@scope` shadowing (rewrite using `globalThis`). https://github.com/rescript-lang/rescript/pull/8100
+- Formatter: normalize underscore placeholders in pipe expressions to canonical form (e.g., `a->map2(_, fn)` formats to `a->map2(fn)`). https://github.com/rescript-lang/rescript/pull/8033
 
 #### :memo: Documentation
 
