@@ -30,6 +30,7 @@
 - Fix rewatch panic on duplicate module name. https://github.com/rescript-lang/rescript/pull/8102
 - Fix `let?` unwrap to use actual variable names from pattern instead of hardcoded "x"/"e". When using `let? Some(myVar) = ...`, the variable name `myVar` is now properly propagated in early returns. https://github.com/rescript-lang/rescript/issues/8085
 - Fix 'Ill-formed list of warnings' errors for ppx's with rescript-legacy. https://github.com/rescript-lang/rescript/pull/8103
+- Fix gentype generating invalid syntax for exotic / escaped record field names and type names. https://github.com/rescript-lang/rescript/pull/8087
 
 #### :memo: Documentation
 
