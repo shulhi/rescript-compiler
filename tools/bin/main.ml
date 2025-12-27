@@ -63,10 +63,8 @@ let version = Version.version
 let getRescriptBinary () =
   let toolsExePath = Sys.executable_name in
   let binDir = Filename.dirname toolsExePath in
-  let rescriptBin = Filename.concat binDir "rescript" in
-  (* On Windows, try with .exe extension *)
-  if Sys.win32 && not (Sys.file_exists rescriptBin) then rescriptBin ^ ".exe"
-  else rescriptBin
+  (* ReScript binaries use .exe extension on all platforms *)
+  Filename.concat binDir "rescript.exe"
 
 (* Build the project using the rescript binary *)
 let buildProject ~rootPath =
