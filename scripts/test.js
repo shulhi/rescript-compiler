@@ -73,11 +73,8 @@ if (ounitTest) {
 }
 
 if (mochaTest) {
-  await execClean([], {
-    cwd: compilerTestDir,
-    stdio: "inherit",
-  });
-
+  // No need to clean beforehand, rewatch detects changes to the compiler binary
+  // and rebuilds automatically in that case.
   await execBuild([], {
     cwd: compilerTestDir,
     stdio: "inherit",
@@ -87,7 +84,7 @@ if (mochaTest) {
     [
       "-t",
       "10000",
-      "tests/tests/**/*_test.mjs",
+      "tests/tests/src/**/*_test.mjs",
       // Ignore the preserve_jsx_test.mjs file.
       // I can't run because Mocha doesn't support jsx.
       // We also want to keep the output as is.
