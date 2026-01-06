@@ -3,10 +3,13 @@
 import assert from "node:assert";
 import { setup } from "#dev/process";
 
-const { execBuildLegacy } = setup(import.meta.dirname);
+const { execBuild, execClean } = setup(import.meta.dirname);
 
-const out = await execBuildLegacy();
+const { stderr } = await execBuild();
+
 assert.match(
-  out.stderr,
+  stderr,
   /deprecated: Option "es6-global" is deprecated\. Use "esmodule" instead\./,
 );
+
+await execClean();
