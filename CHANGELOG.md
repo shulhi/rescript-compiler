@@ -21,6 +21,8 @@
 - Add support for Set, Map, WeakSet and WeakMap to `@unboxed`. https://github.com/rescript-lang/rescript/pull/8009
 - Reanalyze: add reactive incremental analysis (`-reactive`, `-runs`, `-churn`) and Mermaid pipeline dumping (`-mermaid`). https://github.com/rescript-lang/rescript/pull/8092
 
+- Reanalyze: add `reanalyze-server` (long-lived server) with transparent delegation for `rescript-tools reanalyze -json`. https://github.com/rescript-lang/rescript/pull/8127
+
 #### :bug: Bug fix
 
 - Fix rewatch swallowing parse warnings (%todo). https://github.com/rescript-lang/rescript/pull/8135
