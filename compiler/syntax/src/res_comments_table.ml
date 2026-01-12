@@ -476,7 +476,8 @@ let rec is_block_expr expr =
   | Pexp_constraint (expr, _) when is_block_expr expr -> true
   | Pexp_field (expr, _) when is_block_expr expr -> true
   | Pexp_setfield (expr, _, _) when is_block_expr expr -> true
-  | Pexp_index (expr, _, _) when is_block_expr expr -> true
+  | Pexp_index (expr, _) when is_block_expr expr -> true
+  | Pexp_setindex (expr, _, _) when is_block_expr expr -> true
   | _ -> false
 
 let is_if_then_else_expr expr =
@@ -1314,12 +1315,13 @@ and walk_expression expr t comments =
       attach t.leading expr2.pexp_loc leading;
       walk_expression expr2 t inside;
       attach t.trailing expr2.pexp_loc trailing
-  | Pexp_index (container, index, value_opt) -> (
+  | Pexp_index (container, index) ->
+    walk_expression container t comments;
+    walk_expression index t comments
+  | Pexp_setindex (container, index, value) ->
     walk_expression container t comments;
     walk_expression index t comments;
-    match value_opt with
-    | None -> ()
-    | Some value -> walk_expression value t comments)
+    walk_expression value t comments
   | Pexp_ifthenelse (if_expr, then_expr, else_expr) -> (
     let leading, rest = partition_leading_trailing comments expr.pexp_loc in
     attach t.leading expr.pexp_loc leading;
