@@ -182,6 +182,10 @@ let iter_expression f e =
       ->
       expr e1;
       expr e2
+    | Pexp_index (e1, e2, eo) ->
+      expr e1;
+      expr e2;
+      may expr eo
     | Pexp_ifthenelse (e1, e2, eo) ->
       expr e1;
       expr e2;
@@ -2834,6 +2838,42 @@ and type_expect_ ?deprecated_context ~context ?in_function ?(recarg = Rejected)
         exp_attributes = sexp.pexp_attributes;
         exp_env = env;
       }
+  | Pexp_index (scontainer, sindex, svalue_opt) -> (
+    (* Type check as array access (same as current Array.get/set behavior) *)
+    let container = type_exp ~context:None env scontainer in
+    let index =
+      type_expect ~context:None env sindex (instance_def Predef.type_int)
+    in
+    match svalue_opt with
+    | None ->
+      (* Read access: arr[i] -> array<'a> -> int -> 'a *)
+      let element_type = newgenvar () in
+      let array_type = instance_def (Predef.type_array element_type) in
+      unify_exp ~context:None env container array_type;
+      rue
+        {
+          exp_desc = Texp_index (container, index, None);
+          exp_loc = loc;
+          exp_extra = [];
+          exp_type = instance env element_type;
+          exp_attributes = sexp.pexp_attributes;
+          exp_env = env;
+        }
+    | Some svalue ->
+      (* Write access: arr[i] = v -> array<'a> -> int -> 'a -> unit *)
+      let element_type = newgenvar () in
+      let array_type = instance_def (Predef.type_array element_type) in
+      unify_exp ~context:None env container array_type;
+      let value = type_expect ~context:None env svalue element_type in
+      rue
+        {
+          exp_desc = Texp_index (container, index, Some value);
+          exp_loc = loc;
+          exp_extra = [];
+          exp_type = instance_def Predef.type_unit;
+          exp_attributes = sexp.pexp_attributes;
+          exp_env = env;
+        })
   | Pexp_array sargl ->
     let ty = newgenvar () in
     let to_unify = Predef.type_array ty in
