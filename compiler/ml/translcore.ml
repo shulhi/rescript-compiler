@@ -891,6 +891,18 @@ and transl_exp0 (e : Typedtree.expression) : Lambda.lambda =
         Psetfield (lbl.lbl_pos + 1, Lambda.fld_record_extension_set lbl)
     in
     Lprim (access, [transl_exp arg; transl_exp newval], e.exp_loc)
+  | Texp_index (container, index, value_opt) -> (
+    let container_lambda = transl_exp container in
+    let index_lambda = transl_exp index in
+    match value_opt with
+    | None ->
+      (* Read: translate to Parrayrefu primitive (unsafe array get) *)
+      Lprim (Parrayrefu, [container_lambda; index_lambda], e.exp_loc)
+    | Some value ->
+      (* Write: translate to Parraysetu primitive (unsafe array set) *)
+      let value_lambda = transl_exp value in
+      Lprim
+        (Parraysetu, [container_lambda; index_lambda; value_lambda], e.exp_loc))
   | Texp_array expr_list ->
     let ll = transl_list expr_list in
     Lprim (Pmakearray Mutable, ll, e.exp_loc)
