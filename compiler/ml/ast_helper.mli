@@ -163,12 +163,13 @@ module Exp : sig
   val field : ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
   val setfield :
     ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression -> expression
-  val index :
+  val index : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
+  val setindex :
     ?loc:loc ->
     ?attrs:attrs ->
     expression ->
     expression ->
-    expression option ->
+    expression ->
     expression
   val array : ?loc:loc -> ?attrs:attrs -> expression list -> expression
   val ifthenelse :
