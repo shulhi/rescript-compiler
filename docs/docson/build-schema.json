@@ -165,7 +165,6 @@
               "type": "string",
               "description": "name of the directory"
             },
-
             "type": {
               "enum": ["dev"]
             },
@@ -373,7 +372,7 @@
       "items": {
         "type": "string"
       },
-      "description": "a list of directories that bsb will not look into"
+      "description": "a list of directories that the build system will not look into"
     },
     "bs-dependencies": {
       "$ref": "#/definitions/dependencies",
@@ -454,7 +453,7 @@
     },
     "js-post-build": {
       "$ref": "#/definitions/js-post-build",
-      "description": "(Experimental) post-processing hook. bsb will invoke `cmd ${file}` whenever a `${file}` is changed"
+      "description": "(Experimental) post-processing hook. The build system will invoke `cmd ${file}` whenever a `${file}` is changed"
     },
     "package-specs": {
       "$ref": "#/definitions/package-specs",
