@@ -103,13 +103,9 @@ let set_debug ~gtconf =
   | _ -> ()
 
 let compiler_config_file = "rescript.json"
-let legacy_compiler_config_file = "bsconfig.json"
 
 let rec find_project_root ~dir =
-  if
-    Sys.file_exists (Filename.concat dir compiler_config_file)
-    || Sys.file_exists (Filename.concat dir legacy_compiler_config_file)
-  then dir
+  if Sys.file_exists (Filename.concat dir compiler_config_file) then dir
   else
     let parent = dir |> Filename.dirname in
     if parent = dir then (
@@ -238,9 +234,9 @@ let read_config ~get_config_file ~namespace =
   in
   let default_config = {default with project_root; bsb_project_root} in
   match get_config_file ~project_root with
-  | Some bs_config_file -> (
+  | Some config_file -> (
     try
-      let json = bs_config_file |> Ext_json_parse.parse_json_from_file in
+      let json = config_file |> Ext_json_parse.parse_json_from_file in
       match json with
       | Obj {map = bsconf} -> (
         match bsconf |> get_opt "gentypeconfig" with
