@@ -366,6 +366,7 @@
     "lib/js/Stdlib_Uint8ClampedArray.js",
     "lib/js/Stdlib_WeakMap.js",
     "lib/js/Stdlib_WeakSet.js",
+    "lib/js/package.json",
     "lib/ocaml/Belt.cmi",
     "lib/ocaml/Belt.cmj",
     "lib/ocaml/Belt.cmt",
