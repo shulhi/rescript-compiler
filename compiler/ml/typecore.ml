@@ -2864,9 +2864,17 @@ and type_expect_ ?deprecated_context ~context ?in_function ?(recarg = Rejected)
     let index =
       type_expect ~context:None env sindex (instance_def Predef.type_int)
     in
-    let element_type = newgenvar () in
-    let array_type = instance_def (Predef.type_array element_type) in
-    unify_exp ~context:None env container array_type;
+    (* Extract element type from container to preserve arity information *)
+    let element_type =
+      match (expand_head env container.exp_type).desc with
+      | Tconstr (Pident {name = "array"}, [element_ty], _) -> element_ty
+      | _ ->
+        (* Fallback: create fresh type variable and unify *)
+        let element_type = newgenvar () in
+        let array_type = instance_def (Predef.type_array element_type) in
+        unify_exp ~context:None env container array_type;
+        element_type
+    in
     let value = type_expect ~context:None env svalue element_type in
     rue
       {
