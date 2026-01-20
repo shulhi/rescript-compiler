@@ -103,6 +103,7 @@
     "tests/docstring_tests",
     "tests/gentype_tests/**",
     "tests/tools_tests",
+    "tests/commonjs_tests",
     "scripts/res"
   ],
   "packageManager": "yarn@4.12.0",
