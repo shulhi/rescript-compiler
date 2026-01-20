@@ -1,1 +1,4 @@
-{"name": "rescript-commonjs-tests", "type": "commonjs"}
+{
+  "name": "rescript-commonjs-tests",
+  "type": "commonjs"
+}
