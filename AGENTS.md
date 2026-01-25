@@ -389,6 +389,20 @@ make test-rewatch     # Run integration tests
 
 **Integration Tests**: The `make test-rewatch` command runs bash-based integration tests located in `rewatch/tests/suite.sh`. These tests use the `rewatch/testrepo/` directory as a test workspace with various package configurations to verify rewatch's behavior across different scenarios.
 
+**Running Individual Integration Tests**: You can run individual test scripts directly by setting up the environment manually:
+
+```bash
+cd rewatch/tests
+export REWATCH_EXECUTABLE="$(realpath ../target/debug/rescript)"
+eval $(node ./get_bin_paths.js)
+export RESCRIPT_BSC_EXE
+export RESCRIPT_RUNTIME
+source ./utils.sh
+bash ./watch/06-watch-missing-source-folder.sh
+```
+
+This is useful for iterating on a specific test without running the full suite.
+
 #### Debugging
 
 - **Build State**: Use `log::debug!` to inspect `BuildState` contents
@@ -411,7 +425,15 @@ export RESCRIPT_RUNTIME=$(realpath packages/@rescript/runtime)
 cargo run --manifest-path rewatch/Cargo.toml -- build
 ```
 
+Note that the dev binary is `./rewatch/target/debug/rescript`, not `rewatch`. The binary name is `rescript` because that's the package name in `Cargo.toml`.
+
 This is useful when testing rewatch changes against local compiler modifications without running a full `make` build cycle.
+
+Use `-v` for info-level logging or `-vv` for debug-level logging (e.g., to see which folders are being watched in watch mode):
+
+```bash
+cargo run --manifest-path rewatch/Cargo.toml -- -vv watch <folder>
+```
 
 #### Performance Considerations
 
@@ -467,3 +489,9 @@ When clippy suggests refactoring that could impact performance, consider the tra
 2. Update `AsyncWatchArgs` for new parameters
 3. Handle different file types (`.res`, `.resi`, etc.)
 4. Consider performance impact of watching many files
+
+## CI Gotchas
+
+- **`sleep` is fragile** — Prefer polling (e.g., `wait_for_file`) over fixed sleeps. CI runners are slower than local machines.
+- **`exit_watcher` is async** — It only signals the watcher to stop (removes the lock file), it doesn't wait for the process to exit. Avoid triggering config-change events before exiting, as the watcher may start a concurrent rebuild.
+- **`sed -i` differs across platforms** — macOS requires `sed -i '' ...`, Linux does not. Use the `replace` / `normalize_paths` helpers from `rewatch/tests/utils.sh` instead of raw `sed`.

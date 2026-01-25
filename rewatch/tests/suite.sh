@@ -28,6 +28,15 @@ fi
 
 source ./utils.sh
 
+bold "Check for stale rescript processes"
+STALE_PIDS=$(ps aux | grep "$REWATCH_EXECUTABLE" | grep -v grep | awk '{print $2}')
+if [ -n "$STALE_PIDS" ]; then
+  error "Found stale rescript processes using this executable:"
+  ps aux | grep "$REWATCH_EXECUTABLE" | grep -v grep
+  exit 1
+fi
+success "No stale rescript processes found"
+
 bold "Yarn install"
 (cd ../testrepo && yarn && cp node_modules/rescript-nodejs/bsconfig.json node_modules/rescript-nodejs/rescript.json)
 
@@ -77,6 +86,10 @@ fi
 # Watch tests
 ./watch/01-watch-recompile.sh &&
 ./watch/02-watch-warnings-persist.sh &&
+./watch/03-watch-new-file.sh &&
+./watch/04-watch-config-change.sh &&
+./watch/05-watch-ignores-non-source.sh &&
+./watch/06-watch-missing-source-folder.sh &&
 
 # Lock tests
 ./lock/01-lock-when-watching.sh &&
