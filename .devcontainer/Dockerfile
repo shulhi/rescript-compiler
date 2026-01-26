@@ -12,3 +12,8 @@ RUN sudo apt-get update && export DEBIAN_FRONTEND=noninteractive \
 # Install OPAM
 ARG OPAM_VERSION=2.5.0
 RUN printf '\n\n' | bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh) --version $OPAM_VERSION"
+
+USER vscode
+ENV HOME=/home/vscode
+
+RUN opam init -y --shell-setup --enable-shell-hook --compiler=5.3.0 --disable-sandboxing
